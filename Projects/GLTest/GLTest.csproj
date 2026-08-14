@@ -9,7 +9,7 @@
   </PropertyGroup>
 
 	<Target Name="ChiselBuildContent" BeforeTargets="Build">
-		<Exec Command="dotnet run --project &quot;$(MSBuildThisFileDirectory)..\Chisel.Resource.Builder&quot; -- &quot;$(MSBuildProjectDirectory)&quot; &quot;$(OutDir)Content&quot; --pack" />
+		<Exec Command="dotnet run --project &quot;$(MSBuildThisFileDirectory)..\..\Engine\Chisel.Resource.Builder&quot; -- &quot;$(MSBuildProjectDirectory)&quot; &quot;$(OutDir)Content&quot; --pack" />
 	</Target>
 
 	<ItemGroup>
