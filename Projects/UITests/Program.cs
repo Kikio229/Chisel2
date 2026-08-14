@@ -47,7 +47,7 @@ public class TestGame : Game
 
     //ImGuiRenderer imgui;
 
-    public TestGame() : base(GraphicsBackend.OpenGL, true)
+    public TestGame() : base(GraphicsBackend.Direct3D12, true)
     {
         Window.SetTickMode(false);
         Window.SetVsyncMode(false);
