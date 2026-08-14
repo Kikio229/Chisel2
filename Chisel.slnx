@@ -8,5 +8,6 @@
   <Folder Name="/Projects/">
     <Project Path="Projects/DXTest/DXTest.csproj" />
     <Project Path="Projects/GLTest/GLTest.csproj" />
+    <Project Path="UITests/UITests.csproj" Id="21cd2297-586a-4c72-b0eb-38093db01ca3" />
   </Folder>
 </Solution>
