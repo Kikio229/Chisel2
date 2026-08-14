@@ -1,0 +1,45 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<OutputType>Library</OutputType>
+		<TargetFrameworks>net9.0</TargetFrameworks>
+		<Nullable>enable</Nullable>
+		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+	</PropertyGroup>
+
+	<PropertyGroup Condition="($(RuntimeIdentifier) == '' and $([MSBuild]::IsOSPlatform('Windows'))) or $(RuntimeIdentifier.StartsWith('win'))">
+		<DefineConstants>WINDOWS</DefineConstants>
+		<IsWindows>true</IsWindows>
+	</PropertyGroup>
+
+	<PropertyGroup Condition="($(RuntimeIdentifier) == '' and $([MSBuild]::IsOSPlatform('Linux'))) or $(RuntimeIdentifier.StartsWith('linux'))">
+		<DefineConstants>LINUX</DefineConstants>
+		<IsLinux>true</IsLinux>
+	</PropertyGroup>
+
+	<!-- Managed packages -->
+	<ItemGroup>
+		<PackageReference Include="Hexa.NET.SDL3" Version="1.2.17" />
+		<PackageReference Include="Silk.NET.OpenGL" Version="2.23.0" />
+		<PackageReference Include="SkiaSharp" Version="4.151.1" />
+		<PackageReference Include="StbImageSharp" Version="2.30.16" />
+		<PackageReference Include="Vortice.Win32.Graphics.Direct3D12" Version="2.5.0" />
+		<PackageReference Include="Vortice.Win32.Graphics.Direct3D.Dxc" Version="2.5.0" />
+		<PackageReference Include="Vortice.Win32.Graphics.D3D12MemoryAllocator" Version="2.5.0" />
+	</ItemGroup>
+
+	<!-- Native Packages -->
+	<ItemGroup Condition="$(IsWindows) == 'true'">
+		<PackageReference Include="Vortice.Dxc.Native" Version="1.0.5" />
+		<PackageReference Include="Vortice.D3D12MA.Native" Version="1.0.2" />
+	</ItemGroup>
+
+	<ItemGroup Condition="$(IsLinux) == 'true'">
+		<PackageReference Include="Vortice.Dxc.Native" Version="1.0.5" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <ProjectReference Include="..\Chisel.Resources.Core\Chisel.Resources.Core.csproj" />
+	</ItemGroup>
+
+</Project>

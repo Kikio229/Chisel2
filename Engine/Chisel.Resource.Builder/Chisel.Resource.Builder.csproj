@@ -1,0 +1,27 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Silk.NET.SPIRV.Cross" Version="2.23.0" />
+    <PackageReference Include="Vortice.Dxc.Native" Version="1.0.5" />
+    <PackageReference Include="Vortice.Win32.Graphics.Direct3D.Dxc" Version="2.5.0" />
+    <PackageReference Include="Vortice.Win32.Graphics.Direct3D12" Version="2.5.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Chisel.Resources.Core\Chisel.Resources.Core.csproj" />
+  </ItemGroup>
+    <ItemGroup>
+	    <EmbeddedResource Include="ShaderLibrary\*.hlsli" />
+    </ItemGroup>
+	<ItemGroup>
+		<EmbeddedResource Include="ShaderLibrary\BuiltIn\*.hlsl" />
+	</ItemGroup>
+</Project>
