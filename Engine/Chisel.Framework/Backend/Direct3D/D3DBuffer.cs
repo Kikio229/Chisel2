@@ -10,10 +10,9 @@ internal class D3DBuffer : Disposable, IBuffer
     public ulong Size { get; }
     public BufferType Type { get; }
     public BufferUsage Usage { get; }
+
     internal Allocation Allocation { get; }
     internal unsafe ID3D12Resource* Resource { get; }
-
-    // Tracks whatever was last put here
     internal ResourceStates State;
 
     public unsafe D3DBuffer(Allocator allocator, ulong size, BufferType type, BufferUsage usage)
@@ -30,10 +29,10 @@ internal class D3DBuffer : Disposable, IBuffer
 
         AllocationDesc allocDesc = new AllocationDesc()
         {
-            HeapType = GetHeapTypeFromBuffer(Type)
+            HeapType = D3DUtilities.GetHeapTypeFromBuffer(Type)
         };
 
-        ResourceStates state = GetResourceStateFromBuffer(Type);
+        ResourceStates state = D3DUtilities.GetResourceStateFromBuffer(Type);
 
         Allocation allocation;
         ID3D12Resource* resource;
@@ -58,27 +57,5 @@ internal class D3DBuffer : Disposable, IBuffer
             Allocation.Release();
             Resource->Release();
         }
-    }
-
-    private static HeapType GetHeapTypeFromBuffer(BufferType type)
-    {
-        return type switch
-        {
-            BufferType.GpuOnly => HeapType.Default,
-            BufferType.Upload => HeapType.Upload,
-            BufferType.Readback => HeapType.Readback,
-            _ => HeapType.Default
-        };
-    }
-
-    private static ResourceStates GetResourceStateFromBuffer(BufferType type)
-    {
-        return type switch
-        {
-            BufferType.GpuOnly => ResourceStates.Common,
-            BufferType.Upload => ResourceStates.GenericRead,
-            BufferType.Readback => ResourceStates.CopyDest,
-            _ => ResourceStates.Common
-        };
     }
 }

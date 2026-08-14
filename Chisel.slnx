@@ -3,7 +3,6 @@
     <Project Path="Engine/Chisel.Framework.ImGUI/Chisel.Framework.ImGUI.csproj" />
     <Project Path="Engine/Chisel.Framework/Chisel.Framework.csproj" />
     <Project Path="Engine/Chisel.Resource.Builder/Chisel.Resource.Builder.csproj" />
-    <Project Path="Engine/Chisel.Resources.Core/Chisel.Resources.Core.csproj" />
     <Project Path="Engine/Chisel/Chisel.csproj" Id="34dccec1-f704-4f32-8619-e45298987c00" />
   </Folder>
   <Folder Name="/Projects/">

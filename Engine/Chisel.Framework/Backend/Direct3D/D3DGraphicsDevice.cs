@@ -793,7 +793,7 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
 
         ShaderResourceViewDescription srvDesc = new ShaderResourceViewDescription
         {
-            Format = D3DImage.GetDxgiFormatFromImage(d3dImage.Format),
+            Format = D3DUtilities.GetDxgiFormatFromImage(d3dImage.Format),
             ViewDimension = Vortice.Win32.Graphics.Direct3D12.SrvDimension.Texture2D,
             Shader4ComponentMapping = 5768,
             Anonymous = new ShaderResourceViewDescription._Anonymous_e__Union
@@ -992,7 +992,7 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
         // TexSubImage2D doesn't care about row alignment. D3D12 does: CopyTextureRegion's source
         // footprint RowPitch must be a multiple of D3D12_TEXTURE_DATA_PITCH_ALIGNMENT (256), which
         // a tightly-packed row very often isn't. So we repack.
-        uint tightRowPitch = dst.Width * D3DImage.GetBytesPerPixel(dst.Format);
+        uint tightRowPitch = dst.Width * D3DUtilities.GetBytesPerPixel(dst.Format);
         ulong paddedSize = footprint.Footprint.RowPitch * (ulong)footprint.Footprint.Height;
 
         D3DBuffer padded = new D3DBuffer(_allocator, paddedSize, BufferType.Upload, BufferUsage.CopySource);
@@ -1059,7 +1059,7 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
         Transition(_cmdList.Get(), d3dSrc.Resource, ref d3dSrc.State, ResourceStates.ResolveSource);
         Transition(_cmdList.Get(), d3dDst.Resource, ref d3dDst.State, ResourceStates.ResolveDest);
 
-        _cmdList.Get()->ResolveSubresource(d3dDst.Resource, 0, d3dSrc.Resource, 0, D3DImage.GetDxgiFormatFromImage(d3dDst.Format));
+        _cmdList.Get()->ResolveSubresource(d3dDst.Resource, 0, d3dSrc.Resource, 0, D3DUtilities.GetDxgiFormatFromImage(d3dDst.Format));
 
         ResourceStates dstFinal = (d3dDst.Usage & ImageUsage.Sampled) != 0 ? ResourceStates.PixelShaderResource : ResourceStates.Common;
         Transition(_cmdList.Get(), d3dDst.Resource, ref d3dDst.State, dstFinal);
@@ -1220,7 +1220,7 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
             return;
         }
 
-        uint bpp = D3DImage.GetBytesPerPixel(img.Format);
+        uint bpp = D3DUtilities.GetBytesPerPixel(img.Format);
         byte[] currentLevel = baseLevelData.ToArray();
         uint currentWidth = img.Width;
         uint currentHeight = img.Height;
@@ -1284,7 +1284,7 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
         ulong totalBytes;
         _device.Get()->GetCopyableFootprints(&desc, mip, 1, 0, &footprint, null, null, &totalBytes);
 
-        uint tightRowPitch = width * D3DImage.GetBytesPerPixel(dst.Format);
+        uint tightRowPitch = width * D3DUtilities.GetBytesPerPixel(dst.Format);
         ulong paddedSize = footprint.Footprint.RowPitch * (ulong)footprint.Footprint.Height;
 
         D3DBuffer padded = new D3DBuffer(_allocator, paddedSize, BufferType.Upload, BufferUsage.CopySource);

@@ -18,7 +18,7 @@ internal class D3DComputeState : Disposable, IGraphicsState
 
         DescriptorRange* ranges = stackalloc DescriptorRange[4];
         RootParameter* parameters = stackalloc RootParameter[5];
-        D3DGraphicsState.FillStaticRootParameters(parameters, ranges);
+        D3DUtilities.GetStaticRootParameters(parameters, ranges);
         RootSignatureDescription rootDesc = new RootSignatureDescription()
         {
             NumParameters = 5,
@@ -85,81 +85,5 @@ internal class D3DComputeState : Disposable, IGraphicsState
             PipelineState->Release();
             RootSignature->Release();
         }
-    }
-
-    private static unsafe RootParameter* GetStaticRootParameters()
-    {
-        DescriptorRange cbtRange = new DescriptorRange(DescriptorRangeType.Cbv, 16, 0, 0);
-        DescriptorRange srtRange = new DescriptorRange(DescriptorRangeType.Srv, 16, 0, 0);
-        DescriptorRange uavRange = new DescriptorRange(DescriptorRangeType.Uav, 16, 0, 0);
-        DescriptorRange stRange = new DescriptorRange(DescriptorRangeType.Sampler, 16, 0, 0);
-
-        RootParameter* rootParams = stackalloc RootParameter[5]
-        {
-            new RootParameter() // Root constants
-            {
-                Anonymous = new RootParameter._Anonymous_e__Union()
-                {
-                    Constants = new RootConstants()
-                    {
-                        ShaderRegister = 16,
-                        Num32BitValues = 0,
-                        RegisterSpace = 1,
-                    }
-                },
-                ShaderVisibility = ShaderVisibility.All
-
-            },
-            new RootParameter() // Constant buffer
-            {
-                Anonymous = new RootParameter._Anonymous_e__Union()
-                {
-                    DescriptorTable = new RootDescriptorTable()
-                    {
-                        NumDescriptorRanges = 1,
-                        pDescriptorRanges = &cbtRange
-                    }
-                },
-                ShaderVisibility = ShaderVisibility.All
-            },
-            new RootParameter() // Shader resource
-            {
-                Anonymous = new RootParameter._Anonymous_e__Union()
-                {
-                    DescriptorTable = new RootDescriptorTable()
-                    {
-                        NumDescriptorRanges = 1,
-                        pDescriptorRanges = &srtRange
-                    }
-                },
-                ShaderVisibility = ShaderVisibility.All
-            },
-            new RootParameter() // Unordered access
-            {
-                Anonymous = new RootParameter._Anonymous_e__Union()
-                {
-                    DescriptorTable = new RootDescriptorTable()
-                    {
-                        NumDescriptorRanges = 1,
-                        pDescriptorRanges = &uavRange
-                    }
-                },
-                ShaderVisibility = ShaderVisibility.All
-            },
-            new RootParameter() // Sampler
-            {
-                Anonymous = new RootParameter._Anonymous_e__Union()
-                {
-                    DescriptorTable = new RootDescriptorTable()
-                    {
-                        NumDescriptorRanges = 1,
-                        pDescriptorRanges = &stRange
-                    }
-                },
-                ShaderVisibility = ShaderVisibility.All
-            },
-        };
-
-        return rootParams;
     }
 }

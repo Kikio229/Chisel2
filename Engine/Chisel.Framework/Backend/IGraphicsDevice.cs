@@ -1,6 +1,6 @@
-﻿using Chisel.Resource;
+﻿using System;
 using Microsoft.Xna.Framework; // TODO: Change the XNA namespace
-using System;
+using Chisel.Resource;
 
 namespace Chisel.Framework;
 
@@ -10,13 +10,14 @@ public interface IGraphicsDevice
     ImageFormat[] CurrentColorFormats { get; }
     ImageFormat? CurrentDepthStencilFormat { get; }
     uint CurrentSampleCount { get; }
+
     void BeginFrame();
     void EndFrame();
     void BeginDrawing(IRenderTarget target);
     void EndDrawing();
-    void Resize(int width, int height);
     void Clear(Color clearColor);
     void Clear(GraphicsClearFlags flags, Color clearColor, float clearDepth, int clearStencil);
+    void Resize(int width, int height);
     void Draw(uint vtxCount);
     void DrawIndexed(uint idxCount);
     void DrawIndexed(uint idxCount, uint startIndex, int baseVertex);
@@ -44,10 +45,9 @@ public interface IGraphicsDevice
     void UpdateBuffer(IBuffer buffer, ReadOnlySpan<byte> data, ulong offset);
     void CopyBuffer(IBuffer bufSrc, IBuffer bufDst);
     void CopyBufferToImage(IBuffer bufSrc, IImage imgDst);
+    void ResolveImage(IImage src, IImage dst); // For MSAA
     void CopyImage(IImage imgSrc, IImage imgDst);
     void CopyImageToBuffer(IImage imgSrc, IBuffer bufDst);
-    void ResolveImage(IImage src, IImage dst); // For MSAA
-
     void GenerateMips(IImage image, ReadOnlySpan<byte> baseLevelData);
 
     IBuffer CreateBuffer(BufferDescription bufDesc);

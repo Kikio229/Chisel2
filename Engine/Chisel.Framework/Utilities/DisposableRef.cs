@@ -15,7 +15,7 @@ public abstract class DisposableRef : IDisposable
 
     ~DisposableRef()
     {
-        Dispose();
+        Dispose(true);
     }
 
     public void AddRef()

@@ -1,11 +1,9 @@
 ﻿using Chisel.Framework;
 using Chisel.Framework.ImGUI;
-using Chisel.Framework.Skia;
 using Chisel.Framework.Utilities;
 using Chisel.Resource;
 using ImGuiNET;
 using Microsoft.Xna.Framework;
-using SkiaSharp;
 using System.Runtime.InteropServices;
 
 [StructLayout(LayoutKind.Sequential)]
@@ -49,7 +47,6 @@ public class TestGame : Game
     double elapsed;
 
     //ImGuiRenderer imgui;
-    ISkiaSurface skiaSurface;
 
     public TestGame() : base(GraphicsBackend.OpenGL, true)
     {
@@ -88,7 +85,6 @@ public class TestGame : Game
         screenTexture = new RenderTarget2D(GraphicsDevice, Window.Resolution.W, Window.Resolution.H, 
             ImageFormat.R32G32B32A32Float, ImageFormat.D24UNormS8UInt, 4);
 
-        skiaSurface = SkiaTargetFactory.Create(GraphicsDevice, Window.Resolution.W, Window.Resolution.H);
 
         UpdateProjection();
 
@@ -258,29 +254,12 @@ public class TestGame : Game
         QuickDraw.BindIndexBuffer(cubeIndices);
         QuickDraw.DrawIndexed((uint)cubeIndices.Count);
 
-        skiaSurface.Invalidate(); // animating every frame for this test - dirty-flag skip isn't the point here
-        skiaSurface.PrepareForDrawing();
-
-        using (SKPaint paint = new SKPaint { Color = new SKColor(30, 30, 40, 220), IsAntialias = true })
-        {
-            skiaSurface.Canvas.Clear(SKColors.Transparent);
-            skiaSurface.Canvas.DrawRoundRect(new SKRect(10, 10, 390, 290), 16, 16, paint);
-        }
-
-        using (SKPaint circlePaint = new SKPaint { Color = SKColors.OrangeRed, IsAntialias = true })
-        {
-            float cx = 200 + MathF.Cos((float)elapsed) * 120;
-            skiaSurface.Canvas.DrawCircle(cx, 150, 24, circlePaint);
-        }
-
-        skiaSurface.Flush();
-
         screenTexture.End();
 
         spriteBatch.Begin(Matrix.CreateOrthographicOffCenter(0, Window.Resolution.W, Window.Resolution.H, 0, 0, 1));
 
         spriteBatch.Draw(screenTexture, Vector2.Zero, new(Window.Resolution.W, Window.Resolution.H), Color.White);
-        spriteBatch.Draw(skiaSurface.Texture, Vector2.Zero, new(Window.Resolution.W, Window.Resolution.H), Color.White);
+        //spriteBatch.Draw(skiaSurface.Texture, Vector2.Zero, new(Window.Resolution.W, Window.Resolution.H), Color.White);
 
         spriteBatch.End();
 

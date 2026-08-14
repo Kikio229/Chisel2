@@ -27,6 +27,7 @@ internal class D3DRenderTarget : Disposable, IRenderTarget
 
         Width = ColorImages is { Length: > 0 } ? ColorImages[0].Width : DepthStencilImage!.Width;
         Height = ColorImages is { Length: > 0 } ? ColorImages[0].Height : DepthStencilImage!.Height;
+
         if (ColorImages is { Length: > 0 })
         {
             _rtvHeap = new D3DDescriptorHeap(device, DescriptorHeapType.Rtv, (uint)ColorImages.Length, shaderVisible: false);
@@ -38,7 +39,7 @@ internal class D3DRenderTarget : Disposable, IRenderTarget
 
                 RenderTargetViewDescription rtvDesc = new RenderTargetViewDescription
                 {
-                    Format = D3DImage.GetDxgiFormatFromImage(ColorImages[i].Format),
+                    Format = D3DUtilities.GetDxgiFormatFromImage(ColorImages[i].Format),
                     ViewDimension = multisampled ? RtvDimension.Texture2DMs : RtvDimension.Texture2D,
                 };
 
@@ -57,7 +58,7 @@ internal class D3DRenderTarget : Disposable, IRenderTarget
 
             DepthStencilViewDescription dsvDesc = new DepthStencilViewDescription
             {
-                Format = D3DImage.GetDxgiFormatFromImage(DepthStencilImage.Format),
+                Format = D3DUtilities.GetDxgiFormatFromImage(DepthStencilImage.Format),
                 ViewDimension = multisampled ? DsvDimension.Texture2DMs : DsvDimension.Texture2D,
                 Flags = DsvFlags.None,
             };

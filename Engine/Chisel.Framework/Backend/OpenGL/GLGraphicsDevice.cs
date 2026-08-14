@@ -1,4 +1,4 @@
-﻿using Chisel.Framework.Skia;
+﻿
 using Chisel.Resource;
 using Hexa.NET.SDL3;
 using Microsoft.Xna.Framework; // TODO: Change the XNA namespace
@@ -85,8 +85,6 @@ public class GLGraphicsDevice : Disposable, IGraphicsDevice
         }
 
         SDL.GLSetSwapInterval(Game.Instance!.Window.IsVsyncOn ? 1 : 0);
-
-        SkiaGL.Init();
 
         // Default state
         currentState = new GLGraphicsState(gl, 0, new GraphicsStateDescription());
