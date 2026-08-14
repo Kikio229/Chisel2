@@ -289,15 +289,11 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
 
         WaitForGpuIdle();
 
-        Logger.AppendBasic("=== BEFORE DISPOSE ===");
-        ReportLiveObjects();
-
         for (uint i = 0; i < _frameCount; i++)
         {
             _backBuffers[i].Dispose();
         }
 
-        Logger.AppendBasic("=== AFTER DISPOSE ===");
         ReportLiveObjects();
 
         SwapChainDescription1 desc;
@@ -1822,9 +1818,32 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
 
     private unsafe void DumpDebugMessages(ID3D12Device* device)
     {
-        // existing ID3D12InfoQueue dump...
-        ulong count = _infoQueue.Get()->GetNumStoredMessages();
-        // ... (unchanged)
+        ID3D12InfoQueue* infoQueue;
+
+        fixed (Guid* gptr = &ID3D12InfoQueue.IID_ID3D12InfoQueue)
+        {
+            if (device->QueryInterface(gptr, (void**)&infoQueue) != HResult.Ok)
+            {
+                return;
+            }
+        }
+
+        ulong count = infoQueue->GetNumStoredMessages();
+
+        for (ulong i = 0; i < count; i++)
+        {
+            nuint size = 0;
+            infoQueue->GetMessage(i, null, &size);
+            if (size == 0) continue;
+
+            Message* message = (Message*)Marshal.AllocHGlobal((int)size);
+            infoQueue->GetMessage(i, message, &size);
+            Logger.AppendLog("D3D", Marshal.PtrToStringAnsi((nint)message->pDescription)!, ConsoleColor.Red, 1);
+            Marshal.FreeHGlobal((nint)message);
+        }
+
+        infoQueue->ClearStoredMessages();
+        infoQueue->Release();
 
         // DXGI-producer messages (this is where ResizeBuffers errors actually land)
         if (_dxgiInfoQueue.Get() != null)
