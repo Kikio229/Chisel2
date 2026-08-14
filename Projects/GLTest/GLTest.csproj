@@ -13,7 +13,6 @@
 	</Target>
 
 	<ItemGroup>
-	  <ProjectReference Include="..\..\Engine\Chisel.Framework.ImGUI\Chisel.Framework.ImGUI.csproj" />
 	  <ProjectReference Include="..\..\Engine\Chisel.Framework\Chisel.Framework.csproj" />
 	  <ProjectReference Include="..\..\Engine\Chisel.Resource.Builder\Chisel.Resource.Builder.csproj" />
 	</ItemGroup>
