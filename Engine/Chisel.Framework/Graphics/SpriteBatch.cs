@@ -12,9 +12,9 @@ namespace Chisel.Framework;
 [StructLayout(LayoutKind.Sequential)]
 public struct SpriteVertex
 {
-    [VertexAttribute(0)] public Vector3 Position;
-    [VertexAttribute(1)] public Vector2 UV;
-    [VertexAttribute(2)] public Vector4 Color;
+    [Vertex(0)] public Vector3 Position;
+    [Vertex(1)] public Vector2 UV;
+    [Vertex(2)] public Vector4 Color;
 }
 
 public class SpriteBatch : IDisposable

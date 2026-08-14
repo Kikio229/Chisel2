@@ -7,9 +7,9 @@ public struct ImageDescription
     public uint Width;
     public uint Height;
     public uint MipLevels;
+    public uint SampleCount;
     public ImageFormat Format;
     public ImageUsage Usage;
-    public uint SampleCount;
 
     public ImageDescription()
     {

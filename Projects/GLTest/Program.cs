@@ -9,8 +9,8 @@ using System.Runtime.InteropServices;
 [StructLayout(LayoutKind.Sequential)]
 struct VertexPositionColor
 {
-    [VertexAttribute(0)] public Vector3 Position;
-    [VertexAttribute(1)] public Vector3 Color;
+    [Vertex(0)] public Vector3 Position;
+    [Vertex(1)] public Vector3 Color;
 
     public VertexPositionColor(Vector3 position, Vector3 color)
     {

@@ -33,7 +33,7 @@ public static class VertexLayoutCache
 
         foreach (FieldInfo field in type.GetFields(BindingFlags.Public | BindingFlags.Instance))
         {
-            VertexAttributeAttribute marker = field.GetCustomAttribute<VertexAttributeAttribute>();
+            VertexAttribute marker = field.GetCustomAttribute<VertexAttribute>();
 
             if (marker == null)
             {
@@ -57,35 +57,35 @@ public static class VertexLayoutCache
         };
     }
 
-    static VertexElementFormat MapFormat(Type fieldType)
+    static VertexFormat MapFormat(Type fieldType)
     {
         if (fieldType == typeof(float))
         {
-            return VertexElementFormat.Float1;
+            return VertexFormat.Float1;
         }
         if (fieldType == typeof(Vector2))
         {
-            return VertexElementFormat.Float2;
+            return VertexFormat.Float2;
         }
         if (fieldType == typeof(Vector3))
         {
-            return VertexElementFormat.Float3;
+            return VertexFormat.Float3;
         }
         if (fieldType == typeof(Vector4))
         {
-            return VertexElementFormat.Float4;
+            return VertexFormat.Float4;
         }
         if (fieldType == typeof(int))
         {
-            return VertexElementFormat.Int1;
+            return VertexFormat.Int1;
         }
         if (fieldType == typeof(uint))
         {
-            return VertexElementFormat.UInt1;
+            return VertexFormat.UInt1;
         }
         if (fieldType == typeof(byte))
         {
-            return VertexElementFormat.Byte1;
+            return VertexFormat.Byte1;
         }
         throw new NotSupportedException("No vertex format mapping for " + fieldType.Name);
     }

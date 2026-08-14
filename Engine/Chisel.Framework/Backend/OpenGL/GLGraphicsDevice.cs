@@ -861,41 +861,41 @@ public class GLGraphicsDevice : Disposable, IGraphicsDevice
         throw new ArgumentOutOfRangeException(nameof(stage));
     }
 
-    static bool IsIntegerFormat(VertexElementFormat format)
+    static bool IsIntegerFormat(VertexFormat format)
     {
         switch (format)
         {
-            case VertexElementFormat.Int1:
-            case VertexElementFormat.UInt1:
-            case VertexElementFormat.Byte1:
+            case VertexFormat.Int1:
+            case VertexFormat.UInt1:
+            case VertexFormat.Byte1:
                 return true;
             default:
                 return false;
         }
     }
-    static int GetComponentCount(VertexElementFormat format)
+    static int GetComponentCount(VertexFormat format)
     {
         switch (format)
         {
-            case VertexElementFormat.Float2:
+            case VertexFormat.Float2:
                 return 2;
-            case VertexElementFormat.Float3:
+            case VertexFormat.Float3:
                 return 3;
-            case VertexElementFormat.Float4:
+            case VertexFormat.Float4:
                 return 4;
             default:
                 return 1;
         }
     }
-    static VertexAttribIType GetIntegerType(VertexElementFormat format)
+    static VertexAttribIType GetIntegerType(VertexFormat format)
     {
         switch (format)
         {
-            case VertexElementFormat.Int1:
+            case VertexFormat.Int1:
                 return VertexAttribIType.Int;
-            case VertexElementFormat.UInt1:
+            case VertexFormat.UInt1:
                 return VertexAttribIType.UnsignedInt;
-            case VertexElementFormat.Byte1:
+            case VertexFormat.Byte1:
                 return VertexAttribIType.UnsignedByte;
             default:
                 throw new ArgumentOutOfRangeException(nameof(format));

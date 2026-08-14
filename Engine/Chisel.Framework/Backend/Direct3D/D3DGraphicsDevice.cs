@@ -115,6 +115,9 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
     private ComPtr<ID3D12Fence1> _fence;
     private Allocator _allocator;
 
+    // New field alongside _infoQueue
+    private ComPtr<IDXGIInfoQueue> _dxgiInfoQueue;
+
 
     public D3DGraphicsDevice(bool debug)
     {
@@ -273,7 +276,7 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
             return;
         }
 
-        //_pendingResize = true; // Enable this to enable resizing.
+        _pendingResize = true; // Enable this to enable resizing.
         _pendingResizeWidth = width;
         _pendingResizeHeight = height;
     }
@@ -286,10 +289,16 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
 
         WaitForGpuIdle();
 
+        Logger.AppendBasic("=== BEFORE DISPOSE ===");
+        ReportLiveObjects();
+
         for (uint i = 0; i < _frameCount; i++)
         {
             _backBuffers[i].Dispose();
         }
+
+        Logger.AppendBasic("=== AFTER DISPOSE ===");
+        ReportLiveObjects();
 
         SwapChainDescription1 desc;
         _swapChain.Get()->GetDesc1(&desc);
@@ -1388,6 +1397,20 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
             debug->SetEnableGPUBasedValidation(true);
             debug->SetEnableSynchronizedCommandQueueValidation(true);
             debug->Release();
+
+            // DXGI-level validation (ResizeBuffers, Present, swap chain creation, etc.)
+            // is a completely separate message producer from the D3D12 device's info queue.
+            IDXGIInfoQueue* dxgiInfoQueue;
+
+            fixed (Guid* gptr = &IDXGIInfoQueue.IID_IDXGIInfoQueue)
+            {
+                if (DXGIGetDebugInterface1(0, gptr, (void**)&dxgiInfoQueue) != HResult.Ok)
+                {
+                    throw new InvalidOperationException("Failed to initialize DXGI debug interface!");
+                }
+            }
+
+            _dxgiInfoQueue = new ComPtr<IDXGIInfoQueue>(dxgiInfoQueue);
         }
     }
 
@@ -1797,34 +1820,38 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
         _allocator = allocator;
     }
 
-    internal static unsafe void DumpDebugMessages(ID3D12Device* device)
+    private unsafe void DumpDebugMessages(ID3D12Device* device)
     {
-        ID3D12InfoQueue* infoQueue;
-        fixed (Guid* gptr = &ID3D12InfoQueue.IID_ID3D12InfoQueue)
+        // existing ID3D12InfoQueue dump...
+        ulong count = _infoQueue.Get()->GetNumStoredMessages();
+        // ... (unchanged)
+
+        // DXGI-producer messages (this is where ResizeBuffers errors actually land)
+        if (_dxgiInfoQueue.Get() != null)
         {
-            if (device->QueryInterface(gptr, (void**)&infoQueue) != HResult.Ok)
+            ulong dxgiCount = _dxgiInfoQueue.Get()->GetNumStoredMessages(DXGI_DEBUG_DXGI);
+
+            for (ulong i = 0; i < dxgiCount; i++)
             {
-                return;
+                nuint size = 0;
+                _dxgiInfoQueue.Get()->GetMessage(DXGI_DEBUG_DXGI, i, null, &size);
+
+                if (size == 0)
+                {
+                    continue;
+                }
+
+                InfoQueueMessage* message = (InfoQueueMessage*)Marshal.AllocHGlobal((int)size);
+
+                _dxgiInfoQueue.Get()->GetMessage(DXGI_DEBUG_DXGI, i, message, &size);
+                Logger.AppendLog("DXGI", Marshal.PtrToStringAnsi((nint)message->pDescription)!, ConsoleColor.Magenta, 1);
+                Marshal.FreeHGlobal((nint)message);
             }
+
+            _dxgiInfoQueue.Get()->ClearStoredMessages(DXGI_DEBUG_DXGI);
         }
-
-        ulong count = infoQueue->GetNumStoredMessages();
-
-        for (ulong i = 0; i < count; i++)
-        {
-            nuint size = 0;
-            infoQueue->GetMessage(i, null, &size);
-            if (size == 0) continue;
-
-            Message* message = (Message*)Marshal.AllocHGlobal((int)size);
-            infoQueue->GetMessage(i, message, &size);
-            Logger.AppendLog("D3D", Marshal.PtrToStringAnsi((nint)message->pDescription)!, ConsoleColor.Red, 1);
-            Marshal.FreeHGlobal((nint)message);
-        }
-
-        infoQueue->ClearStoredMessages();
-        infoQueue->Release();
     }
+
     private unsafe void QueryGpuInfo()
     {
         FeatureLevel* possibleLvls = stackalloc FeatureLevel[5]

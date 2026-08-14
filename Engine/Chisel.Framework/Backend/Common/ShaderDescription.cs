@@ -1,5 +1,5 @@
-﻿using Chisel.Resource;
-using System;
+﻿using System;
+using Chisel.Resource;
 
 namespace Chisel.Framework;
 
@@ -8,7 +8,7 @@ public struct ShaderDescription
     public string Entry;
     public ShaderStage Stage;
     public ReadOnlyMemory<byte> Bytecode;
-    public ShaderReflection Reflection;
+    public ShaderReflection? Reflection;
 
     public ShaderDescription()
     {

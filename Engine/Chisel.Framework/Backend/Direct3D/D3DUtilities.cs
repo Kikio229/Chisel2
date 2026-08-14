@@ -69,17 +69,17 @@ internal static class D3DUtilities
         };
     }
 
-    public static Format GetDxgiFormatFromVertex(VertexElementFormat format)
+    public static Format GetDxgiFormatFromVertex(VertexFormat format)
     {
         return format switch
         {
-            VertexElementFormat.Float1 => Format.R32Float,
-            VertexElementFormat.Float2 => Format.R32G32Float,
-            VertexElementFormat.Float3 => Format.R32G32B32Float,
-            VertexElementFormat.Float4 => Format.R32G32B32A32Float,
-            VertexElementFormat.Int1 => Format.R32Sint,
-            VertexElementFormat.UInt1 => Format.R32Uint,
-            VertexElementFormat.Byte1 => Format.R8Uint,
+            VertexFormat.Float1 => Format.R32Float,
+            VertexFormat.Float2 => Format.R32G32Float,
+            VertexFormat.Float3 => Format.R32G32B32Float,
+            VertexFormat.Float4 => Format.R32G32B32A32Float,
+            VertexFormat.Int1 => Format.R32Sint,
+            VertexFormat.UInt1 => Format.R32Uint,
+            VertexFormat.Byte1 => Format.R8Uint,
             _ => throw new ArgumentOutOfRangeException(nameof(format), format, "Vertex element format is unknown or invalid!")
         };
     }

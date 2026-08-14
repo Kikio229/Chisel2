@@ -30,7 +30,7 @@ internal class D3DDescriptorHeap : Disposable
         {
             if (device->CreateDescriptorHeap(&desc, gptr, (void**)&heap) != HResult.Ok)
             {
-                D3DGraphicsDevice.DumpDebugMessages(device);
+                //D3DGraphicsDevice.DumpDebugMessages(device);
                 throw new InvalidOperationException("Failed to create D3D descriptor heap!");
             }
         }
