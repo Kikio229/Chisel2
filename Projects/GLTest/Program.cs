@@ -177,8 +177,7 @@ public class TestGame : Game
 
         GraphicsDevice.SetViewport(new(0,0), new(width, height));
 
-        screenTexture = new RenderTarget2D(GraphicsDevice, Window.Resolution.W, Window.Resolution.H,
-            ImageFormat.R32G32B32A32Float, ImageFormat.D24UNormS8UInt, 4);
+        screenTexture.Resize(Window.Resolution.W, Window.Resolution.H);
 
         UpdateProjection();
     }

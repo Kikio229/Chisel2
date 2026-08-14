@@ -1,17 +1,16 @@
-﻿using Chisel.Framework;
-using Silk.NET.OpenGL;
-using System;
+﻿using System;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
 namespace Chisel.Framework;
 
-public class ConstantBuffer
+public class ConstantBuffer : IDisposable
 {
     public string Name { get; }
     public uint Slot { get; }
     byte[] data;
     bool dirty;
+    bool disposedValue;
 
     internal IBuffer BackingBuffer;
     internal IGraphicsDevice GraphicsDevice;
@@ -50,5 +49,19 @@ public class ConstantBuffer
             dirty = false;
         }
         GraphicsDevice.BindConstantBuffer(BackingBuffer, Slot);
+    }
+    public void Dispose()
+    {
+        if (disposedValue)
+        {
+            return;
+        }
+
+        if (BackingBuffer is IDisposable disposableBuffer)
+        {
+            disposableBuffer.Dispose();
+        }
+
+        disposedValue = true;
     }
 }

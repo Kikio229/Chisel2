@@ -93,6 +93,7 @@ internal class D3DImage : Disposable, IImage
     {
         if (disposing)
         {
+            Allocation.Release();
             Resource->Release();
         }
     }

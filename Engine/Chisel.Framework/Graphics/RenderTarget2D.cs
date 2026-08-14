@@ -7,17 +7,17 @@ using System.Threading.Tasks;
 namespace Chisel.Framework;
 public class RenderTarget2D : IDisposable
 {
-    public int Width { get; }
-    public int Height { get; }
+    public int Width { get; private set; }
+    public int Height { get; private set; }
     public uint SampleCount { get; }
     public ImageFormat ColorFormat { get; }
     public ImageFormat? DepthFormat { get; }
-    public Texture2D ColorTexture { get; }   // always single-sample - what you actually sample from
-    public Texture2D? DepthTexture { get; }  // null for MSAA targets right now, see note below
+    public Texture2D ColorTexture { get; private set; }
+    public Texture2D? DepthTexture { get; private set; }
 
     Texture2D? msaaColor;
     Texture2D? msaaDepth;
-    internal IRenderTarget Target { get; }   // what Begin()/End() actually bind
+    internal IRenderTarget Target { get; private set; }
     IGraphicsDevice device;
     bool disposedValue;
 
@@ -27,20 +27,37 @@ public class RenderTarget2D : IDisposable
         uint sampleCount = 1)
     {
         this.device = device;
-        Width = width;
-        Height = height;
         SampleCount = sampleCount;
         ColorFormat = colorFormat;
         DepthFormat = depthFormat;
 
-        if (sampleCount > 1)
+        BuildResources(width, height);
+    }
+    // we are stupid lol
+    public void Resize(int width, int height)
+    {
+        if (width == Width && height == Height)
         {
-            msaaColor = new Texture2D(device, width, height, colorFormat, ImageUsage.RenderTarget, sampleCount);
-            ColorTexture = new Texture2D(device, width, height, colorFormat, ImageUsage.Sampled);
+            return;
+        }
 
-            if (depthFormat.HasValue)
+        DisposeResources();
+        BuildResources(width, height);
+    }
+
+    void BuildResources(int width, int height)
+    {
+        Width = width;
+        Height = height;
+
+        if (SampleCount > 1)
+        {
+            msaaColor = new Texture2D(device, width, height, ColorFormat, ImageUsage.RenderTarget, SampleCount);
+            ColorTexture = new Texture2D(device, width, height, ColorFormat, ImageUsage.Sampled);
+
+            if (DepthFormat.HasValue)
             {
-                msaaDepth = new Texture2D(device, width, height, depthFormat.Value, ImageUsage.DepthStencil, sampleCount);
+                msaaDepth = new Texture2D(device, width, height, DepthFormat.Value, ImageUsage.DepthStencil, SampleCount);
             }
 
             Target = device.CreateRenderTarget(new RenderTargetDescription
@@ -51,11 +68,11 @@ public class RenderTarget2D : IDisposable
         }
         else
         {
-            ColorTexture = new Texture2D(device, width, height, colorFormat, ImageUsage.Sampled | ImageUsage.RenderTarget);
+            ColorTexture = new Texture2D(device, width, height, ColorFormat, ImageUsage.Sampled | ImageUsage.RenderTarget);
 
-            if (depthFormat.HasValue)
+            if (DepthFormat.HasValue)
             {
-                DepthTexture = new Texture2D(device, width, height, depthFormat.Value, ImageUsage.DepthStencil);
+                DepthTexture = new Texture2D(device, width, height, DepthFormat.Value, ImageUsage.DepthStencil);
             }
 
             Target = device.CreateRenderTarget(new RenderTargetDescription
@@ -64,6 +81,19 @@ public class RenderTarget2D : IDisposable
                 DepthStencil = DepthTexture?.Image,
             });
         }
+    }
+
+    void DisposeResources()
+    {
+        ColorTexture.Dispose();
+        DepthTexture?.Dispose();
+        msaaColor?.Dispose();
+        msaaDepth?.Dispose();
+        if (Target is IDisposable disposableTarget) disposableTarget.Dispose();
+
+        DepthTexture = null;
+        msaaColor = null;
+        msaaDepth = null;
     }
 
     public void Begin() => device.BeginDrawing(Target);
@@ -84,11 +114,7 @@ public class RenderTarget2D : IDisposable
         {
             if (disposing)
             {
-                ColorTexture.Dispose();
-                DepthTexture?.Dispose();
-                msaaColor?.Dispose();
-                msaaDepth?.Dispose();
-                if (Target is IDisposable disposableTarget) disposableTarget.Dispose();
+                DisposeResources();
             }
             disposedValue = true;
         }

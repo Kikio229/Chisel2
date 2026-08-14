@@ -179,7 +179,7 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
         }
 
         alloc->Reset();
-        _uploadCmdAlloc = new ComPtr<ID3D12CommandAllocator>(alloc);
+        _uploadCmdAlloc.Attach(alloc);
 
         ID3D12GraphicsCommandList* tempList;
 
@@ -203,7 +203,7 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
 
         tempList->Release();
         cmdList->Close();
-        _uploadCmdList = new ComPtr<ID3D12GraphicsCommandList6>(cmdList);
+        _uploadCmdList.Attach(cmdList);
 
         ID3D12Fence* tempFen;
 
@@ -226,7 +226,7 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
         }
 
         tempFen->Release();
-        _uploadFence = new ComPtr<ID3D12Fence1>(fence);
+        _uploadFence.Attach(fence);
         _uploadFenceValue = 0;
         _uploadFenceEvent = new AutoResetEvent(false);
     }
@@ -289,16 +289,10 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
 
         WaitForGpuIdle();
 
-        Logger.AppendBasic("=== BEFORE DISPOSE ===");
-        ReportLiveObjects();
-
         for (uint i = 0; i < _frameCount; i++)
         {
             _backBuffers[i].Dispose();
         }
-
-        Logger.AppendBasic("=== AFTER DISPOSE ===");
-        ReportLiveObjects();
 
         SwapChainDescription1 desc;
         _swapChain.Get()->GetDesc1(&desc);
@@ -340,9 +334,10 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
             _device.Get()->CreateRenderTargetView(backBuffers[j], &targDesc, handle);
         }
 
+        // we are such morons
         for (int k = 0; k < _frameCount; k++)
         {
-            _backBuffers[k] = new ComPtr<ID3D12Resource>(backBuffers[k]);
+            _backBuffers[k].Attach(backBuffers[k]);
             _backBufferStates[k] = ResourceStates.Present;
         }
 
@@ -1410,7 +1405,7 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
                 }
             }
 
-            _dxgiInfoQueue = new ComPtr<IDXGIInfoQueue>(dxgiInfoQueue);
+            _dxgiInfoQueue.Attach(dxgiInfoQueue);
         }
     }
 
@@ -1437,7 +1432,7 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
         }
 
         tempFact->Release();
-        _factory = new ComPtr<IDXGIFactory7>(factory);
+        _factory.Attach(factory);
     }
 
     private unsafe void InitAdapter()
@@ -1507,7 +1502,7 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
         }
 
         bestAdp->Release();
-        _adapter = new ComPtr<IDXGIAdapter4>(adapter);
+        _adapter.Attach(adapter);
     }
 
     private unsafe void InitDevice()
@@ -1533,7 +1528,7 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
         }
 
         tempDev->Release();
-        _device = new ComPtr<ID3D12Device8>(device);
+        _device.Attach(device);
     }
 
     public unsafe void InitInfoQueue()
@@ -1580,7 +1575,7 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
             infoQueue->SetMuteDebugOutput(false);
             infoQueue->SetMessageCountLimit(ulong.MaxValue);
 
-            _infoQueue = new ComPtr<ID3D12InfoQueue>(infoQueue);
+            _infoQueue.Attach(infoQueue);
         }
     }
 
@@ -1601,7 +1596,7 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
             }
         }
 
-        _cmdQueue = new ComPtr<ID3D12CommandQueue>(cmdQueue);
+        _cmdQueue.Attach(cmdQueue);
     }
 
     public unsafe void InitSwapChain()
@@ -1645,7 +1640,7 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
         }
 
         tempChain->Release();
-        _swapChain = new ComPtr<IDXGISwapChain4>(swapChain);
+        _swapChain.Attach(swapChain);
     }
 
     private unsafe void InitBackBuffer()
@@ -1673,7 +1668,7 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
             }
         }
 
-        _renderHeap = new ComPtr<ID3D12DescriptorHeap>(renderHeap);
+        _renderHeap.Attach(renderHeap);
         _renderHeapSize = _device.Get()->GetDescriptorHandleIncrementSize(DescriptorHeapType.Rtv);
 
         ID3D12Resource** backBuffers = stackalloc ID3D12Resource*[(int)_frameCount];
@@ -1708,7 +1703,7 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
 
         for (int k = 0; k < _frameCount; k++)
         {
-            bbPtrs[k] = new ComPtr<ID3D12Resource>(backBuffers[k]);
+            bbPtrs[k].Attach(backBuffers[k]);
         }
 
         _backBuffers = bbPtrs;
@@ -1744,7 +1739,7 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
         }
 
         cmdAlloc->Reset();
-        _cmdAlloc = new ComPtr<ID3D12CommandAllocator>(cmdAlloc);
+        _cmdAlloc.Attach(cmdAlloc);
     }
 
     private unsafe void InitCommandList()
@@ -1771,7 +1766,7 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
 
         tempList->Release();
         cmdList->Close();
-        _cmdList = new ComPtr<ID3D12GraphicsCommandList6>(cmdList);
+        _cmdList.Attach(cmdList);
     }
 
     private unsafe void InitFence()
@@ -1797,7 +1792,7 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
         }
 
         tempFen->Release();
-        _fence = new ComPtr<ID3D12Fence1>(fence);
+        _fence.Attach(fence);
     }
 
     private unsafe void InitMemoryAllocator()

@@ -116,6 +116,11 @@ public class ShaderPass : IDisposable
                         disposableStage.Dispose();
                     }
                 }
+
+                foreach (ConstantBuffer buffer in buffers)
+                {
+                    buffer.Dispose();
+                }
             }
             disposedValue = true;
         }
