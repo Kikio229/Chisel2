@@ -6,18 +6,18 @@ public struct ImageBufferCopyRegion
 {
     public uint Width;
     public uint Height;
-    public uint ImageMipLevel;
-    public ulong BufferOffset;
-    public int OffsetX;
-    public int OffsetY;
+    public int DstOffsetX;
+    public int DstOffsetY;
+    public uint ImgMipLevel;
+    public ulong BuffOffset;
 
     public ImageBufferCopyRegion()
     {
         Width = 0;
         Height = 0;
-        ImageMipLevel = 0;
-        BufferOffset = 0;
-        OffsetX = 0;
-        OffsetY = 0;
+        DstOffsetX = 0; 
+        DstOffsetY = 0;
+        ImgMipLevel = 0;
+        BuffOffset = 0;
     }
 }

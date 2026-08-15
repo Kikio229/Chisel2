@@ -70,12 +70,12 @@ public class Texture2D : IDisposable
         device.UpdateBuffer(stagingBuffer, data, 0);
         device.CopyBufferToImage(stagingBuffer, Image, new ImageBufferCopyRegion
         {
-            BufferOffset = 0,
-            OffsetX = x,
-            OffsetY = y,
             Width = (uint)width,
             Height = (uint)height,
-            ImageMipLevel = 0,
+            BuffOffset = 0,
+            DstOffsetX = x,
+            DstOffsetY = y,
+            ImgMipLevel = 0,
         });
     }
     void EnsureStagingBuffer(ulong size)

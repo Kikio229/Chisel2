@@ -773,10 +773,10 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
         {
             Width = imgDst.Width,
             Height = imgDst.Height,
-            ImageMipLevel = 0,
-            BufferOffset = 0,
-            OffsetX = 0,
-            OffsetY = 0
+            DstOffsetX = 0,
+            DstOffsetY = 0,
+            ImgMipLevel = 0,
+            BuffOffset = 0,
         };
 
         CopyBufferToImage(bufSrc, imgDst, region);
@@ -808,7 +808,7 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
         for (uint i = 0; i < region.Height; i++)
         {
             Buffer.MemoryCopy(
-                (byte*)srcMapped + region.BufferOffset + i * tightRowPitch,
+                (byte*)srcMapped + region.BuffOffset + i * tightRowPitch,
                 (byte*)dstMapped + i * footprint.Footprint.RowPitch,
                 footprint.Footprint.RowPitch,
                 tightRowPitch);
@@ -825,7 +825,7 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
         {
             pResource = dst.Resource,
             Type = TextureCopyType.SubresourceIndex,
-            Anonymous = new TextureCopyLocation._Anonymous_e__Union { SubresourceIndex = region.ImageMipLevel }
+            Anonymous = new TextureCopyLocation._Anonymous_e__Union { SubresourceIndex = region.ImgMipLevel }
         };
 
         TextureCopyLocation srcLoc = new TextureCopyLocation
@@ -835,7 +835,7 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
             Anonymous = new TextureCopyLocation._Anonymous_e__Union { PlacedFootprint = footprint }
         };
 
-        cmdList->CopyTextureRegion(&dstLoc, (uint)region.OffsetX, (uint)region.OffsetY, 0, &srcLoc, null);
+        cmdList->CopyTextureRegion(&dstLoc, (uint)region.DstOffsetX, (uint)region.DstOffsetY, 0, &srcLoc, null);
 
         ResourceStates finalState = (dst.Usage & ImageUsage.Sampled) != 0 ? ResourceStates.PixelShaderResource : ResourceStates.Common;
         BarrierTransition(cmdList, dst.Resource, ref dst.State, finalState);

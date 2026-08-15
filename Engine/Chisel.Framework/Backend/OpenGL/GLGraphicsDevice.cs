@@ -510,7 +510,7 @@ public class GLGraphicsDevice : Disposable, IGraphicsDevice
 
         gl.BindBuffer(BufferTargetARB.PixelUnpackBuffer, glBuffer.Handle);
         gl.BindTexture(TextureTarget.Texture2D, glImage.Handle);
-        gl.TexSubImage2D(TextureTarget.Texture2D, (int)region.ImageMipLevel, region.OffsetX, region.OffsetY, region.Width, region.Height, pixelFormat, pixelType, null);
+        gl.TexSubImage2D(TextureTarget.Texture2D, (int)region.ImgMipLevel, region.DstOffsetX, region.DstOffsetY, region.Width, region.Height, pixelFormat, pixelType, null);
         gl.BindBuffer(BufferTargetARB.PixelUnpackBuffer, 0);
     }
 
