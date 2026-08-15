@@ -22,13 +22,6 @@ public class ShaderParameter
     ConstantBuffer buffer;
     int offset;
 
-    // Deferred binding state for Image/Sampler kinds; Mirrors ConstantBuffer's own deferral
-    // (Write() just touches a CPU byte array; the real device.BindConstantBuffer call happens
-    // later, in ShaderPass.Apply()). SetValue here just records what to bind; the actual
-    // device.BindImage/BindSampler call happens at Apply() time too - via FlushBinding() below -
-    // which runs after BindGraphicsState has claimed this draw's descriptor heap block. Binding
-    // eagerly at SetValue time (the old behavior) wrote into whatever block happened to be
-    // current *right then*, which is wrong the instant a second draw call shares a frame.
     IImage pendingImage;
     ISampler pendingSampler;
 

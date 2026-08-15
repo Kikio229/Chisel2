@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Chisel.Resource;
+using System;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
@@ -8,11 +9,17 @@ public class ConstantBuffer : IDisposable
 {
     public string Name { get; }
     public uint Slot { get; }
+
     byte[] data;
     bool dirty;
     bool disposedValue;
 
-    internal IBuffer BackingBuffer;
+    // On D3D12 a command list is recorded now but only executed later, at EndFrame.
+    readonly bool useRing;
+    IBuffer[] ring;
+    int ringCount;   // how many slots are actually allocated
+    int ringIndex = -1;
+
     internal IGraphicsDevice GraphicsDevice;
 
     public ConstantBuffer(string name, uint slot, int sizeInBytes, IGraphicsDevice device)
@@ -21,13 +28,28 @@ public class ConstantBuffer : IDisposable
         Slot = slot;
         GraphicsDevice = device;
         data = new byte[sizeInBytes];
-        BackingBuffer = device.CreateBuffer(new BufferDescription
+
+        // Only D3D actually needs the ring. GL's driver-level orphaning already gives correct
+        // per-draw semantics with a single buffer
+        useRing = device.Backend == GraphicsBackend.Direct3D12;
+
+        ring = new IBuffer[useRing ? 4 : 1]; // small initial capacity, grows on demand
+        AllocateRingSlot(0);
+        ringCount = 1;
+        ringIndex = 0;
+    }
+
+    IBuffer AllocateRingSlot(int index)
+    {
+        IBuffer buffer = GraphicsDevice.CreateBuffer(new BufferDescription
         {
-            Size = (ulong)sizeInBytes,
+            Size = (ulong)data.Length,
             Type = BufferType.Upload,
             Usage = BufferUsage.Constant,
         });
-        GraphicsDevice.UpdateBuffer(BackingBuffer, data, 0);
+        GraphicsDevice.UpdateBuffer(buffer, data, 0);
+        ring[index] = buffer;
+        return buffer;
     }
 
     internal void Write<T>(int offset, in T value) where T : unmanaged
@@ -35,21 +57,54 @@ public class ConstantBuffer : IDisposable
         MemoryMarshal.Write(data.AsSpan(offset, Unsafe.SizeOf<T>()), ref Unsafe.AsRef(value));
         dirty = true;
     }
+
     internal void WriteArray<T>(int offset, ReadOnlySpan<T> values) where T : unmanaged
     {
         ReadOnlySpan<byte> bytes = MemoryMarshal.AsBytes(values);
         bytes.CopyTo(data.AsSpan(offset, bytes.Length));
         dirty = true;
     }
+
     internal void FlushAndBind()
     {
-        if (dirty)
+        IBuffer target;
+
+        if (useRing)
         {
-            GraphicsDevice.UpdateBuffer(BackingBuffer, data, 0);
-            dirty = false;
+            // Every bind is a distinct logical use of this cbuffer's current bytes, so always advance
+            // to a fresh physical slot
+            ringIndex++;
+
+            if (ringIndex >= ringCount)
+            {
+                if (ringIndex >= ring.Length)
+                {
+                    Array.Resize(ref ring, ring.Length * 2);
+                }
+
+                target = AllocateRingSlot(ringIndex);
+                ringCount = ringIndex + 1;
+            }
+            else
+            {
+                target = ring[ringIndex];
+                GraphicsDevice.UpdateBuffer(target, data, 0);
+            }
         }
-        GraphicsDevice.BindConstantBuffer(BackingBuffer, Slot);
+        else
+        {
+            target = ring[0];
+
+            if (dirty)
+            {
+                GraphicsDevice.UpdateBuffer(target, data, 0);
+            }
+        }
+
+        dirty = false;
+        GraphicsDevice.BindConstantBuffer(target, Slot);
     }
+
     public void Dispose()
     {
         if (disposedValue)
@@ -57,9 +112,12 @@ public class ConstantBuffer : IDisposable
             return;
         }
 
-        if (BackingBuffer is IDisposable disposableBuffer)
+        for (int i = 0; i < ringCount; i++)
         {
-            disposableBuffer.Dispose();
+            if (ring[i] is IDisposable disposableBuffer)
+            {
+                disposableBuffer.Dispose();
+            }
         }
 
         disposedValue = true;
