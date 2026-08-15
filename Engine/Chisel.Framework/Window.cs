@@ -24,7 +24,6 @@ public class Window : Disposable
     public (int W, int H) Resolution { get; private set; }
     public float Opacity { get; private set; }
     public int Display { get; private set; }
-    public bool IsTickOn { get; private set; }
     public bool IsVsyncOn { get; private set; }
     public bool IsFullscreen { get; private set; }
     public bool IsMinimized { get; private set; }
@@ -198,14 +197,11 @@ public class Window : Disposable
 
             accumulator += delta;
 
-            if (IsTickOn)
+            // Very very important we don't miss any ticks
+            while (accumulator >= tickDelta)
             {
-                // Very very important we don't miss any ticks
-                while (accumulator >= tickDelta)
-                {
-                    TickUpdate?.Invoke(tickDelta);
-                    accumulator -= tickDelta;
-                }
+                TickUpdate?.Invoke(tickDelta);
+                accumulator -= tickDelta;
             }
 
             // That being said, dropping frames is okay
@@ -486,10 +482,6 @@ public class Window : Disposable
     }
     public unsafe void StartTextInput() => SDL.StartTextInput(Handle);
     public unsafe void StopTextInput() => SDL.StopTextInput(Handle);
-    public void SetTickMode(bool enabled)
-    {
-        IsTickOn = enabled;
-    }
 
     public unsafe void SetCursorMode(CursorMode mode)
     {

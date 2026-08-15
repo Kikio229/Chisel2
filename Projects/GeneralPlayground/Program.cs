@@ -40,9 +40,8 @@ public class TestGame : Game
     Vector3 forward;
     double elapsed;
 
-    public TestGame() : base(GraphicsBackend.Auto, true)
+    public TestGame() : base(GraphicsBackend.Auto, false)
     {
-        Window.SetTickMode(false);
         Window.SetVsyncMode(false);
     }
 
