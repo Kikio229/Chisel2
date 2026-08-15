@@ -31,9 +31,12 @@ public class GLGraphicsDevice : Disposable, IGraphicsDevice
     internal GLGraphicsState currentState; // To avoid duplicate state changes
     DebugProc debugCallback;
 
-    // me no likey but me have-y to
-    uint vao;
-    Dictionary<uint, uint> vertexBufferSlots = new Dictionary<uint, uint>();
+    private Dictionary<(uint bufferHandle, VertexLayoutDescription layout), uint> vaoCache = new();
+    private Dictionary<uint, uint> vertexBufferSlots = new Dictionary<uint, uint>();
+    private uint currentVaoInUse;
+
+    private uint[] boundTextureBySlot = new uint[16];
+    private uint[] boundSamplerBySlot = new uint[16];
 
     private Rectangle currentViewport;
 
@@ -303,33 +306,30 @@ public class GLGraphicsDevice : Disposable, IGraphicsDevice
     {
         throw new NotImplementedException("Not implemented in GL");
     }
-    void EnsureVertexArray()
-    {
-        if (vao == 0)
-        {
-            vao = gl.GenVertexArray();
-        }
-
-        gl.BindVertexArray(vao);
-    }
 
     public void BindVertexBuffer(IBuffer buffer, uint slot)
     {
         GLBuffer glBuffer = (GLBuffer)buffer;
-
-        EnsureVertexArray();
-        gl.BindBuffer(BufferTargetARB.ArrayBuffer, glBuffer.Handle);
         vertexBufferSlots[slot] = glBuffer.Handle;
     }
 
     public unsafe void SetVertexLayout(VertexLayoutDescription layout, uint slot)
     {
-        EnsureVertexArray();
-
         if (!vertexBufferSlots.TryGetValue(slot, out uint bufferHandle))
         {
             throw new InvalidOperationException("No vertex buffer bound to slot " + slot + " before SetVertexLayout.");
         }
+
+        var key = (bufferHandle, layout);
+
+        if (vaoCache.TryGetValue(key, out uint cachedVao))
+        {
+            gl.BindVertexArray(cachedVao);
+            return; // attributes are already configured on this VAO from when it was built
+        }
+
+        uint newVao = gl.GenVertexArray();
+        gl.BindVertexArray(newVao);
         gl.BindBuffer(BufferTargetARB.ArrayBuffer, bufferHandle);
 
         foreach (VertexAttributeDescription attribute in layout.Attributes)
@@ -347,12 +347,19 @@ public class GLGraphicsDevice : Disposable, IGraphicsDevice
 
             gl.EnableVertexAttribArray(attribute.Location);
         }
+
+        vaoCache[key] = newVao;
+        currentVaoInUse = newVao;
     }
 
     public void BindIndexBuffer(IBuffer buffer)
     {
+        if (currentVaoInUse == 0)
+        {
+            throw new InvalidOperationException("BindIndexBuffer called before SetVertexLayout - there's no VAO bound yet to associate the index buffer with.");
+        }
+
         GLBuffer glBuffer = (GLBuffer)buffer;
-        EnsureVertexArray();
         gl.BindBuffer(BufferTargetARB.ElementArrayBuffer, glBuffer.Handle);
     }
 
@@ -362,15 +369,35 @@ public class GLGraphicsDevice : Disposable, IGraphicsDevice
         gl.BindBufferBase(BufferTargetARB.UniformBuffer, slot, glBuffer.Handle);
     }
 
+
+    // GL is not magic yet
+    public void BindConstantBuffer(IBuffer buffer, ulong offset, uint size, uint slot)
+    {
+        throw new NotImplementedException();
+    }
+
+    public (IBuffer arena, ulong offset) SuballocateConstantBuffer(ReadOnlySpan<byte> data)
+    {
+        throw new NotImplementedException();
+    }
+
     public void BindStorageBuffer(IBuffer buffer)
     {
 
     }
+
     public void BindImage(IImage image, uint slot)
     {
         GLImage glImage = (GLImage)image;
+
+        if (boundTextureBySlot[slot] == glImage.Handle)
+        {
+            return;
+        }
+
         gl.ActiveTexture(TextureUnit.Texture0 + (int)slot);
         gl.BindTexture(TextureTarget.Texture2D, glImage.Handle);
+        boundTextureBySlot[slot] = glImage.Handle;
     }
 
     public void BindSampler(ISampler sampler, uint slot)
@@ -387,10 +414,13 @@ public class GLGraphicsDevice : Disposable, IGraphicsDevice
             return;
         }
 
-        gl.UseProgram(state.ProgramHandle);
+        if (state.ProgramHandle != currentState.ProgramHandle)
+        {
+            gl.UseProgram(state.ProgramHandle);
+        }
 
         // Depth
-        if(state.DepthTestEnabled && !currentState.DepthTestEnabled)
+        if (state.DepthTestEnabled && !currentState.DepthTestEnabled)
         {
             gl.Enable(EnableCap.DepthTest);
             gl.DepthFunc(state.DepthFunc);
@@ -914,14 +944,5 @@ public class GLGraphicsDevice : Disposable, IGraphicsDevice
             default:
                 throw new ArgumentOutOfRangeException(nameof(format));
         }
-    }
-
-    // GL is not magic yet
-
-    public void BindConstantBuffer(IBuffer buffer, ulong offset, uint size, uint slot) => BindConstantBuffer(buffer,slot);
-
-    public (IBuffer arena, ulong offset) SuballocateConstantBuffer(ReadOnlySpan<byte> data)
-    {
-        throw new NotImplementedException();
     }
 }
