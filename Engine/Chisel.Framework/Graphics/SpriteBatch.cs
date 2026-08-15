@@ -118,7 +118,7 @@ public class SpriteBatch : IDisposable
         currentClip = null;
         viewProjectionParam.SetValue(viewProjection);
 
-        device.Clear(GraphicsClearFlags.Depth, Color.Black, 1.0f, 0);
+        device.Clear(Color.Black, 1.0f, 0, GraphicsClearFlags.Depth);
     }
     public void DrawString(string text, int fontSize, Vector2 position, Color color)
     {
@@ -150,7 +150,7 @@ public class SpriteBatch : IDisposable
         Vector2 uvMin = Vector2.Zero;
         Vector2 uvMax = Vector2.One;
 
-        if (device.Backend == GraphicsBackend.OpenGL)
+        if (device.Backend == GraphicsBackend.OpenGL46)
         {
             // GL rasterizes into an FBO with the opposite row order D3D does, relative to
             // clip space. Sampling it with the same UVs as a loaded texture comes out

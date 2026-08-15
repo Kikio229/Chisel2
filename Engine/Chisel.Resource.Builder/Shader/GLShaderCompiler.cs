@@ -11,7 +11,7 @@ unsafe class GLShaderCompiler : IShaderCompiler
 {
     static Cross api = Cross.GetApi();
 
-    public GraphicsBackend Backend => GraphicsBackend.OpenGL;
+    public GraphicsBackend Backend => GraphicsBackend.OpenGL46;
 
     const bool DumpShaders = false;
 

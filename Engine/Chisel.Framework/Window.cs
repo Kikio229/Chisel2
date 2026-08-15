@@ -96,7 +96,7 @@ public class Window : Disposable
         }
 
         // GL has to init BEFORE the window
-        if (Backend == GraphicsBackend.OpenGL)
+        if (Backend == GraphicsBackend.OpenGL46)
         {
             SDL.GLSetAttribute(SDLGLAttr.ContextProfileMask, 0x0001); // Core
             SDL.GLSetAttribute(SDLGLAttr.ContextMajorVersion, 3);
@@ -115,7 +115,7 @@ public class Window : Disposable
 
         Handle = SDL.CreateWindow(Title, Resolution.W, Resolution.H, (uint)flags);
 
-        if (Backend == GraphicsBackend.OpenGL)
+        if (Backend == GraphicsBackend.OpenGL46)
         {
             GLContext = SDL.GLCreateContext(Handle);
             SDL.GLMakeCurrent(Handle, GLContext);

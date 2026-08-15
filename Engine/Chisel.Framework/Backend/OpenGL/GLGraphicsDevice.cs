@@ -21,9 +21,9 @@ public class GLGraphicsDevice : Disposable, IGraphicsDevice
     static extern nint GetProcAddress(nint module, string procName);
 #endif
 
-    public GraphicsBackend Backend => GraphicsBackend.OpenGL; 
+    public GraphicsBackend Backend => GraphicsBackend.OpenGL46; 
     // this doesnt really matter on GL
-    public uint CurrentFrameIndex => 0;
+    public uint FrameIndex => 0;
     public uint BufferingCount => 2;
 
     internal GL gl;
@@ -42,9 +42,9 @@ public class GLGraphicsDevice : Disposable, IGraphicsDevice
     private ImageFormat? _currentDepthStencilFormat;
     private uint _currentSampleCount = 1;
 
-    public ImageFormat[] CurrentColorFormats => _currentColorFormats;
-    public ImageFormat? CurrentDepthStencilFormat => _currentDepthStencilFormat;
-    public uint CurrentSampleCount => _currentSampleCount;
+    public ImageFormat[] ColorFormats => _currentColorFormats;
+    public ImageFormat? DepthStencilFormat => _currentDepthStencilFormat;
+    public uint SampleCount => _currentSampleCount;
     private void ResetToBackBufferFormats()
     {
         _currentColorFormats = _backBufferColorFormats;
@@ -205,6 +205,11 @@ public class GLGraphicsDevice : Disposable, IGraphicsDevice
 
     public void DrawIndexedInstanced(uint idxCount, uint instCount)
     {
+        DrawIndexedInstanced(idxCount, instCount, 0, 0);
+    }
+
+    public void DrawIndexedInstanced(uint idxCount, uint instCount, uint startIndex, int baseVertex)
+    {
         // I think the input sig is wrong for this
     }
 
@@ -230,16 +235,10 @@ public class GLGraphicsDevice : Disposable, IGraphicsDevice
 
     public void Clear(Color clearColor)
     {
-        Vector4 cc = clearColor.ToVector4();
-        gl.ClearColor(cc.X, cc.Y, cc.Z, cc.W);
-        gl.ClearDepth(1.0);
-
-        gl.DepthMask(true);
-        gl.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
-        gl.DepthMask(currentState.DepthWriteEnabled);
+        Clear(clearColor, 1.0f, 0, GraphicsClearFlags.Color | GraphicsClearFlags.Depth);
     }
 
-    public void Clear(GraphicsClearFlags flags, Color clearColor, float clearDepth, int clearStencil)
+    public void Clear(Color clearColor, float clearDepth, int clearStencil, GraphicsClearFlags flags)
     {
         Vector4 cc = clearColor.ToVector4();
         gl.ClearColor(cc.X, cc.Y, cc.Z, cc.W);
@@ -289,7 +288,7 @@ public class GLGraphicsDevice : Disposable, IGraphicsDevice
         else gl.Disable(EnableCap.ScissorTest);
     }
 
-    public void GenerateMips(IImage image, ReadOnlySpan<byte> baseLevelData)
+    public void GenerateMipmaps(IImage image, ReadOnlySpan<byte> baseLevelData)
     {
         GLImage glImage = (GLImage)image;
         if (glImage.MipLevels <= 1) return;
@@ -455,6 +454,11 @@ public class GLGraphicsDevice : Disposable, IGraphicsDevice
         gl.CopyBufferSubData(CopyBufferSubDataTarget.CopyReadBuffer, CopyBufferSubDataTarget.CopyWriteBuffer, 0, 0, (nuint)glSrc.Size);
     }
 
+    public unsafe void CopyBuffer(IBuffer bufSrc, IBuffer bufDst, BufferCopyRegion region)
+    {
+        throw new NotImplementedException("stub!!!");
+    }
+
     public unsafe void CopyBufferToImage(IBuffer bufSrc, IImage imgDst)
     {
         GLBuffer glBuffer = (GLBuffer)bufSrc;
@@ -467,7 +471,7 @@ public class GLGraphicsDevice : Disposable, IGraphicsDevice
         gl.TexSubImage2D(TextureTarget.Texture2D, 0, 0, 0, glImage.Width, glImage.Height, pixelFormat, pixelType, null);
         gl.BindBuffer(BufferTargetARB.PixelUnpackBuffer, 0);
     }
-    public unsafe void CopyBufferToImage(IBuffer bufSrc, IImage imgDst, ImageCopyRegion region)
+    public unsafe void CopyBufferToImage(IBuffer bufSrc, IImage imgDst, ImageBufferCopyRegion region)
     {
         GLBuffer glBuffer = (GLBuffer)bufSrc;
         GLImage glImage = (GLImage)imgDst;
@@ -482,12 +486,22 @@ public class GLGraphicsDevice : Disposable, IGraphicsDevice
 
     public void CopyImage(IImage imgSrc, IImage imgDst)
     {
+        throw new NotImplementedException("TODO: Image copying is not implemented on either backend yet!");
+    }
 
+    public void CopyImage(IImage imgSrc, IImage imgDst, ImageCopyRegion region)
+    {
+        throw new NotImplementedException("TODO: Image copying is not implemented on either backend yet!");
     }
 
     public void CopyImageToBuffer(IImage imgSrc, IBuffer bufDst)
     {
+        throw new NotImplementedException("TODO: Image copying to buffer is not implemented on either backend yet!");
+    }
 
+    public void CopyImageToBuffer(IImage imgSrc, IBuffer bufDst, ImageBufferCopyRegion region)
+    {
+        throw new NotImplementedException("TODO: Image copying to buffer is not implemented on either backend yet!");
     }
 
     public unsafe void ResolveImage(IImage src, IImage dst)
@@ -711,7 +725,7 @@ public class GLGraphicsDevice : Disposable, IGraphicsDevice
 
     protected override unsafe void Dispose(bool disposing)
     {
-        if (Backend == GraphicsBackend.OpenGL)
+        if (Backend == GraphicsBackend.OpenGL46)
         {
             SDL.GLDestroyContext(glCTX);
         }
@@ -920,7 +934,7 @@ public class GLGraphicsDevice : Disposable, IGraphicsDevice
 
     public void BindConstantBuffer(IBuffer buffer, ulong offset, uint size, uint slot) => BindConstantBuffer(buffer,slot);
 
-    public (IBuffer arena, ulong offset) SuballocateConstantBuffer(ReadOnlySpan<byte> data)
+    public (IBuffer arena, ulong offset) SuballocateBuffer(ReadOnlySpan<byte> data)
     {
         throw new NotImplementedException();
     }

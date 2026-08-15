@@ -2,6 +2,6 @@
 
 namespace Chisel.Framework;
 
-public struct ImageCopyRegion
+public struct BufferCopyRegion
 {
 }

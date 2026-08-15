@@ -54,7 +54,7 @@ public class Texture2D : IDisposable
         {
             try
             {
-                device.GenerateMips(Image, data);
+                device.GenerateMipmaps(Image, data);
                 Logger.AppendLog("Texture2D", "GenerateMips completed successfully.", ConsoleColor.Yellow, 1);
             }
             catch (Exception ex)
@@ -68,7 +68,7 @@ public class Texture2D : IDisposable
     {
         EnsureStagingBuffer((ulong)data.Length);
         device.UpdateBuffer(stagingBuffer, data, 0);
-        device.CopyBufferToImage(stagingBuffer, Image, new ImageCopyRegion
+        device.CopyBufferToImage(stagingBuffer, Image, new ImageBufferCopyRegion
         {
             BufferOffset = 0,
             DestX = x,

@@ -63,7 +63,7 @@ public class Game
 
         switch (Window.Backend)
         {
-            case GraphicsBackend.OpenGL:
+            case GraphicsBackend.OpenGL46:
                 GraphicsDevice = new GLGraphicsDevice(Window.GLContext, _isDebug);
                 break;
             case GraphicsBackend.Direct3D12:

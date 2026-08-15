@@ -143,9 +143,9 @@ public static class QuickDraw
 
     static void EnsureStateBound()
     {
-        requestedState.ColorFormats = device.CurrentColorFormats;
-        requestedState.DepthStencilFormat = device.CurrentDepthStencilFormat;
-        requestedState.SampleCount = device.CurrentSampleCount;
+        requestedState.ColorFormats = device.ColorFormats;
+        requestedState.DepthStencilFormat = device.DepthStencilFormat;
+        requestedState.SampleCount = device.SampleCount;
 
         if (!stateCache.TryGetValue(requestedState, out IGraphicsState state))
         {

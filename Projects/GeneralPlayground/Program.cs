@@ -38,7 +38,7 @@ public class TestGame : Game
     Vector3 forward;
     double elapsed;
 
-    public TestGame() : base(GraphicsBackend.Direct3D12, true)
+    public TestGame() : base(GraphicsBackend.OpenGL46, false)
     {
         Window.SetTickMode(false);
         Window.SetVsyncMode(false);
@@ -173,7 +173,7 @@ public class TestGame : Game
         spriteBatch.Draw(screenTexture, Vector2.Zero, new(Window.Resolution.W, Window.Resolution.H), Color.White);
         spriteBatch.End();
 
-        GraphicsDevice.Clear(GraphicsClearFlags.Depth, default, 1f, 0);
+        GraphicsDevice.Clear(default, 1f, 0, GraphicsClearFlags.Depth);
     }
 
     protected override void OnShutdown()

@@ -7,7 +7,7 @@ public enum GraphicsBackend
 {
     Auto,
     Direct3D12,
-    OpenGL,
+    OpenGL46,
 }
 public struct ShaderVariantEntry
 {

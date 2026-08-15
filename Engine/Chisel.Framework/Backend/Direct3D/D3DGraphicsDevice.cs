@@ -20,12 +20,12 @@ namespace Chisel.Framework;
 
 public class D3DGraphicsDevice : Disposable, IGraphicsDevice
 {
-    public uint CurrentSampleCount => _sampleCount;
-    public GraphicsBackend Backend => GraphicsBackend.Direct3D12;
-    public ImageFormat[] CurrentColorFormats => _colorFormats;
-    public ImageFormat? CurrentDepthStencilFormat => _depthStencilFormat;
-    public uint CurrentFrameIndex => _frameIndex;
+    public uint FrameIndex => _frameIndex;
+    public uint SampleCount => _sampleCount;
     public uint BufferingCount => _maxFramesInFlight;
+    public GraphicsBackend Backend => GraphicsBackend.Direct3D12;
+    public ImageFormat[] ColorFormats => _colorFormats;
+    public ImageFormat? DepthStencilFormat => _depthStencilFormat;
 
     private uint _renderHeapSize, _frameCount, _sampleCount;
     private ulong _mainFenceValue, _uploadFenceValue;
@@ -70,7 +70,6 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
     private const uint _srvRangeSize = 16;
     private const uint _uavRangeSize = 16;
     private const uint _samplerRangeSize = 16;
-
     private const uint _maxFramesInFlight = 2;
 
     // Each region is now _maxFramesInFlight independent slices, one per back-buffer index - so a
@@ -164,10 +163,8 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
         InitCommandList();
         InitFence();
         InitMemoryAllocator();
+        InitBufferArenas(); // magic magic magic magic....
         QueryGpuInfo();
-
-        // magic magic magic magic....
-        InitConstantBufferArenas();
 
         _swapWidth = (uint)Game.Instance!.Window.Resolution.W;
         _swapHeight = (uint)Game.Instance!.Window.Resolution.H;
@@ -177,31 +174,12 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
         _samplerSlots = new Dictionary<uint, D3DSampler>();
         _resourceHeap = new D3DDescriptorHeap((ID3D12Device*)_device.Get(), DescriptorHeapType.CbvSrvUav, _resourceHeapCapacity, shaderVisible: true);
         _samplerHeap = new D3DDescriptorHeap((ID3D12Device*)_device.Get(), DescriptorHeapType.Sampler, _samplerHeapCapacity, shaderVisible: true);
-
         _backBufferStates = new ResourceStates[_frameCount];
+
         for (uint i = 0; i < _frameCount; i++)
         {
             // The swapchain hands these back already in the Present state
             _backBufferStates[i] = ResourceStates.Present;
-        }
-    }
-
-    // ...magic magic...
-    private unsafe void InitConstantBufferArenas()
-    {
-        _cbufferArenas = new D3DBuffer[_maxFramesInFlight];
-        _cbufferArenaMapped = new void*[_maxFramesInFlight];
-        _cbufferArenaCursor = new ulong[_maxFramesInFlight];
-        _cbufferOverflowBuffers = new List<D3DBuffer>[_maxFramesInFlight];
-
-        for (int lane = 0; lane < _maxFramesInFlight; lane++)
-        {
-            _cbufferArenas[lane] = new D3DBuffer(_allocator, _cbufferArenaCapacity, BufferType.Upload, BufferUsage.Constant);
-            _cbufferOverflowBuffers[lane] = new List<D3DBuffer>();
-
-            void* mapped;
-            _cbufferArenas[lane].Resource->Map(0, null, &mapped);
-            _cbufferArenaMapped[lane] = mapped;
         }
     }
 
@@ -225,10 +203,11 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
         // reset the buffer cursor
         _cbufferArenaCursor[_frameIndex] = 0;
 
-        foreach (D3DBuffer overflow in _cbufferOverflowBuffers[_frameIndex])
+        foreach (var o in _cbufferOverflowBuffers[_frameIndex])
         {
-            overflow.Dispose();
+            o.Dispose();
         }
+
         _cbufferOverflowBuffers[_frameIndex].Clear();
 
         _mainCmdAllocs[_frameIndex].Get()->Reset();
@@ -264,7 +243,7 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
 
         if (_isPendingResize)
         {
-            ResizeInternal(_resizeWidth, _resizeHeight);
+            ResizeSwapchain(_resizeWidth, _resizeHeight);
             _isPendingResize = false;
         }
     }
@@ -278,20 +257,19 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
         }
 
         _currentTarget = rt;
-
-        _colorFormats = rt.ColorImages is { Length: > 0 }
+        _colorFormats = (rt.ColorImages is { Length: > 0 })
             ? Array.ConvertAll(rt.ColorImages, c => c.Format)
             : Array.Empty<ImageFormat>();
         _depthStencilFormat = rt.DepthStencilImage?.Format;
-        _sampleCount = rt.ColorImages is { Length: > 0 }
+        _sampleCount = (rt.ColorImages is { Length: > 0 })
             ? rt.ColorImages[0].SampleCount
             : (rt.DepthStencilImage?.SampleCount ?? 1);
 
         if (rt.ColorImages != null)
         {
-            foreach (D3DImage color in rt.ColorImages)
+            foreach (var c in rt.ColorImages)
             {
-                BarrierTransition((ID3D12GraphicsCommandList*)_mainCmdList.Get(), color.Resource, ref color.State, ResourceStates.RenderTarget);
+                BarrierTransition((ID3D12GraphicsCommandList*)_mainCmdList.Get(), c.Resource, ref c.State, ResourceStates.RenderTarget);
             }
         }
 
@@ -333,14 +311,14 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
     {
         if (_currentTarget?.ColorImages != null)
         {
-            foreach (D3DImage color in _currentTarget.ColorImages)
+            foreach (var c in _currentTarget.ColorImages)
             {
                 // Only transition to a readable state if something could plausibly sample it later,
                 // an attachment that's RenderTarget-only (e.g. an MSAA color target that only ever
                 // gets resolved, never sampled directly) has no reason to leave RenderTarget state.
-                if ((color.Usage & ImageUsage.Sampled) != 0)
+                if ((c.Usage & ImageUsage.Sampled) != 0)
                 {
-                    BarrierTransition((ID3D12GraphicsCommandList*)_mainCmdList.Get(), color.Resource, ref color.State, ResourceStates.PixelShaderResource);
+                    BarrierTransition((ID3D12GraphicsCommandList*)_mainCmdList.Get(), c.Resource, ref c.State, ResourceStates.PixelShaderResource);
                 }
             }
         }
@@ -352,56 +330,39 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
         // Could probably add that, I dont think we really need to.
     }
 
-    private unsafe CpuDescriptorHandle[] CurrentRtvHandles()
+    public void Clear(Color clearColor)
     {
-        if (_currentTarget == null)
-        {
-            CpuDescriptorHandle rtv = _renderHeap.Get()->GetCPUDescriptorHandleForHeapStart();
-            rtv.ptr += (nuint)(_frameIndex * _renderHeapSize);
-            _singleRtvScratch[0] = rtv;
-            return _singleRtvScratch;
-        }
-
-        return _currentTarget.RtvHandles ?? Array.Empty<CpuDescriptorHandle>();
+        Clear(clearColor, 1.0f, 0, GraphicsClearFlags.Color | GraphicsClearFlags.Depth);
     }
 
-    private CpuDescriptorHandle? CurrentDsvHandle() => _currentTarget?.DsvHandle;
-
-    // Shorthand for the flag version, this one just clears color and depth (if available)
-    public unsafe void Clear(Color clearColor)
-    {
-        Vector4 cc = clearColor.ToVector4();
-        float* rgba = stackalloc float[4] { cc.X, cc.Y, cc.Z, cc.W };
-
-        foreach (CpuDescriptorHandle rtv in CurrentRtvHandles())
-        {
-            _mainCmdList.Get()->ClearRenderTargetView(rtv, rgba, 0, null);
-        }
-
-        CpuDescriptorHandle? dsv = CurrentDsvHandle();
-
-        if (dsv.HasValue)
-        {
-            _mainCmdList.Get()->ClearDepthStencilView(dsv.Value, ClearFlags.Depth | ClearFlags.Stencil, 1.0f, 0, 0, null);
-        }
-    }
-
-    public unsafe void Clear(GraphicsClearFlags flags, Color clearColor, float clearDepth, int clearStencil)
+    public unsafe void Clear(Color clearColor, float clearDepth, int clearStencil, GraphicsClearFlags flags)
     {
         if (flags.HasFlag(GraphicsClearFlags.Color))
         {
             Vector4 cc = clearColor.ToVector4();
             float* rgba = stackalloc float[4] { cc.X, cc.Y, cc.Z, cc.W };
 
-            foreach (CpuDescriptorHandle rtv in CurrentRtvHandles())
+            CpuDescriptorHandle[] rtvs;
+
+            if (_currentTarget == null)
             {
-                _mainCmdList.Get()->ClearRenderTargetView(rtv, rgba, 0, null);
+                CpuDescriptorHandle rtv = _renderHeap.Get()->GetCPUDescriptorHandleForHeapStart();
+                rtv.ptr += (nuint)(_frameIndex * _renderHeapSize);
+                _singleRtvScratch[0] = rtv;
+                rtvs = _singleRtvScratch;
+            }
+
+            rtvs = _currentTarget?.RtvHandles ?? Array.Empty<CpuDescriptorHandle>();
+
+            foreach (var r in rtvs)
+            {
+                _mainCmdList.Get()->ClearRenderTargetView(r, rgba, 0, null);
             }
         }
 
         bool clearingDepth = flags.HasFlag(GraphicsClearFlags.Depth);
         bool clearingStencil = flags.HasFlag(GraphicsClearFlags.Stencil);
-        CpuDescriptorHandle? dsv = CurrentDsvHandle();
+        CpuDescriptorHandle? dsv = _currentTarget?.DsvHandle;
 
         if (dsv.HasValue && (clearingDepth || clearingStencil))
         {
@@ -433,69 +394,6 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
         _resizeHeight = height;
     }
 
-    unsafe void ResizeInternal(int width, int height)
-    {
-        if ((uint)width == _swapWidth && (uint)height == _swapHeight)
-        {
-            return;
-        }
-
-        WaitForGPU();
-
-        for (uint i = 0; i < _frameCount; i++)
-        {
-            _backBuffers[i].Dispose();
-        }
-
-        SwapChainDescription1 desc;
-        _swapChain.Get()->GetDesc1(&desc);
-
-        if (_swapChain.Get()->ResizeBuffers(_frameCount, (uint)width, (uint)height, desc.Format, desc.Flags) != HResult.Ok)
-        {
-            FlushD3DInfoQueue();
-            FlushDXGIInfoQueue();
-            throw new InvalidOperationException("Failed to resize D3D swap chain buffers!");
-        }
-
-        ID3D12Resource** backBuffers = stackalloc ID3D12Resource*[(int)_frameCount];
-
-        for (uint i = 0; i < _frameCount; i++)
-        {
-            fixed (Guid* gptr = &ID3D12Resource.IID_ID3D12Resource)
-            {
-                if (_swapChain.Get()->GetBuffer(i, gptr, (void**)&backBuffers[i]) != HResult.Ok)
-                {
-                    throw new InvalidOperationException("Failed to re-acquire D3D back buffers after resize!");
-                }
-            }
-        }
-
-        RenderTargetViewDescription targDesc = new RenderTargetViewDescription()
-        {
-            Format = Format.R8G8B8A8Unorm,
-            ViewDimension = RtvDimension.Texture2D
-        };
-
-        CpuDescriptorHandle start = _renderHeap.Get()->GetCPUDescriptorHandleForHeapStart();
-
-        for (uint j = 0; j < _frameCount; j++)
-        {
-            CpuDescriptorHandle handle = start;
-            handle.ptr += (nuint)(j * _renderHeapSize);
-            _device.Get()->CreateRenderTargetView(backBuffers[j], &targDesc, handle);
-        }
-
-        // we are such morons
-        for (int k = 0; k < _frameCount; k++)
-        {
-            _backBuffers[k].Attach(backBuffers[k]);
-            _backBufferStates[k] = ResourceStates.Present;
-        }
-
-        _swapWidth = (uint)width;
-        _swapHeight = (uint)height;
-    }
-
     public unsafe void Draw(uint vtxCount)
     {
         if (_boundGfxState == null)
@@ -508,12 +406,7 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
 
     public unsafe void DrawIndexed(uint idxCount)
     {
-        if (_boundGfxState == null)
-        {
-            throw new InvalidOperationException("Cannot index draw with no graphics state bound!");
-        }
-
-        _mainCmdList.Get()->DrawIndexedInstanced(idxCount, 1, 0, 0, 0);
+        DrawIndexed(idxCount, 0, 0);
     }
 
     public unsafe void DrawIndexed(uint idxCount, uint startIndex, int baseVertex)
@@ -536,14 +429,19 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
         _mainCmdList.Get()->DrawInstanced(vtxCount, instCount, 0, 0);
     }
 
-    public unsafe void DrawIndexedInstanced(uint idxCount, uint instCount)
+    public void DrawIndexedInstanced(uint idxCount, uint instCount)
+    {
+        DrawIndexedInstanced(idxCount, instCount, 0, 0);
+    }
+
+    public unsafe void DrawIndexedInstanced(uint idxCount, uint instCount, uint startIndex, int baseVertex)
     {
         if (_boundGfxState == null)
         {
             throw new InvalidOperationException("DrawIndexedInstanced called with no graphics state bound.");
         }
 
-        _mainCmdList.Get()->DrawIndexedInstanced(idxCount, instCount, 0, 0, 0);
+        _mainCmdList.Get()->DrawIndexedInstanced(idxCount, instCount, startIndex, baseVertex, 0);
     }
 
     public void DrawIndirect(IBuffer buffer, ulong offset, uint drawCount, uint stride)
@@ -641,28 +539,9 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
         _mainCmdList.Get()->IASetIndexBuffer(&view);
     }
 
-    public unsafe void BindConstantBuffer(IBuffer buffer, uint slot)
+    public void BindConstantBuffer(IBuffer buffer, uint slot)
     {
-        if (slot >= 16)
-        {
-            throw new ArgumentOutOfRangeException(nameof(slot), "Constant buffer slots are limited to b0-b15 by the root signature!");
-        }
-
-        if (!_hasDescriptorBlock)
-        {
-            throw new InvalidOperationException("No graphics or compute state was bound -- There's no descriptor block to write to yet!");
-        }
-
-        D3DBuffer d3dBuffer = (D3DBuffer)buffer;
-        _constantSlots[slot] = d3dBuffer;
-
-        ConstantBufferViewDescription cbvDesc = new ConstantBufferViewDescription
-        {
-            BufferLocation = d3dBuffer.Resource->GetGPUVirtualAddress(),
-            SizeInBytes = (uint)((d3dBuffer.Size + 255) & ~255ul),
-        };
-
-        _device.Get()->CreateConstantBufferView(&cbvDesc, _resourceHeap.GetCpuAt(_currentCbvBase + slot));
+        BindConstantBuffer(buffer, 0, 0, slot);
     }
 
     public unsafe void BindConstantBuffer(IBuffer buffer, ulong offset, uint size, uint slot)
@@ -829,6 +708,35 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
         d3dBuffer.Resource->Unmap(0, null);
     }
 
+    public unsafe (IBuffer arena, ulong offset) SuballocateBuffer(ReadOnlySpan<byte> data)
+    {
+        uint lane = _frameIndex;
+        ulong aligned = (_cbufferArenaCursor[lane] + 255) & ~255ul;
+
+        if (aligned + (ulong)data.Length > _cbufferArenaCapacity)
+        {
+            // Arena exhausted for this frame-lane. Rather than fail the draw, fall back to a
+            // one-off dedicated buffer. Write a warning though, because 4mb is kind of a lot
+            // for simple data.
+            Logger.AppendWarn(
+                $"Constant buffer arena exhausted for frame lane {lane} (needed {data.Length} more " +
+                $"bytes on top of {_cbufferArenaCursor[lane]} already used this frame, budget is " +
+                $"{_cbufferArenaCapacity}). Falling back to a dedicated buffer for this bind - " +
+                "consider raising _cbufferArenaCapacity if this happens often.");
+
+            ulong paddedSize = ((ulong)data.Length + 255) & ~255ul;
+            D3DBuffer fallback = new D3DBuffer(_allocator, paddedSize, BufferType.Upload, BufferUsage.Constant);
+            UpdateBuffer(fallback, data, 0);
+            _cbufferOverflowBuffers[lane].Add(fallback);
+
+            return (fallback, 0);
+        }
+
+        data.CopyTo(new Span<byte>((byte*)_cbufferArenaMapped[lane] + aligned, data.Length));
+        _cbufferArenaCursor[lane] = aligned + (ulong)data.Length;
+        return (_cbufferArenas[lane], aligned);
+    }
+
     public unsafe void CopyBuffer(IBuffer bufSrc, IBuffer bufDst)
     {
         D3DBuffer src = (D3DBuffer)bufSrc;
@@ -849,6 +757,11 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
         BarrierTransition(cmdList, dst.Resource, ref dst.State, ResourceStates.Common);
 
         EndUploadAndWait();
+    }
+
+    public unsafe void CopyBuffer(IBuffer bufSrc, IBuffer bufDst, BufferCopyRegion region)
+    {
+        throw new NotImplementedException("stub!!!");
     }
 
     public unsafe void CopyBufferToImage(IBuffer bufSrc, IImage imgDst)
@@ -877,11 +790,11 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
         src.Resource->Map(0, null, &srcMapped);
         padded.Resource->Map(0, null, &dstMapped);
 
-        for (uint row = 0; row < dst.Height; row++)
+        for (uint i = 0; i < dst.Height; i++)
         {
             Buffer.MemoryCopy(
-                (byte*)srcMapped + row * tightRowPitch,
-                (byte*)dstMapped + row * footprint.Footprint.RowPitch,
+                (byte*)srcMapped + i * tightRowPitch,
+                (byte*)dstMapped + i * footprint.Footprint.RowPitch,
                 footprint.Footprint.RowPitch,
                 tightRowPitch);
         }
@@ -916,7 +829,7 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
         padded.Dispose();
     }
 
-    public unsafe void CopyBufferToImage(IBuffer bufSrc, IImage imgDst, ImageCopyRegion region)
+    public unsafe void CopyBufferToImage(IBuffer bufSrc, IImage imgDst, ImageBufferCopyRegion region)
     {
         D3DBuffer src = (D3DBuffer)bufSrc;
         D3DImage dst = (D3DImage)imgDst;
@@ -939,11 +852,11 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
         src.Resource->Map(0, null, &srcMapped);
         padded.Resource->Map(0, null, &dstMapped);
 
-        for (uint row = 0; row < region.Height; row++)
+        for (uint i = 0; i < region.Height; i++)
         {
             Buffer.MemoryCopy(
-                (byte*)srcMapped + region.BufferOffset + row * tightRowPitch,
-                (byte*)dstMapped + row * footprint.Footprint.RowPitch,
+                (byte*)srcMapped + region.BufferOffset + i * tightRowPitch,
+                (byte*)dstMapped + i * footprint.Footprint.RowPitch,
                 footprint.Footprint.RowPitch,
                 tightRowPitch);
         }
@@ -1001,51 +914,22 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
         throw new NotImplementedException("TODO: Image copying is not implemented on either backend yet!");
     }
 
+    public void CopyImage(IImage imgSrc, IImage imgDst, ImageCopyRegion region)
+    {
+        throw new NotImplementedException("TODO: Image copying is not implemented on either backend yet!");
+    }
+
     public void CopyImageToBuffer(IImage imgSrc, IBuffer bufDst)
     {
         throw new NotImplementedException("TODO: Image copying to buffer is not implemented on either backend yet!");
     }
 
-    // Because some TWAT at microsoft decided they didnt want hardware implementations anymore...
-    // We get to do it ourselves.
-    public void GenerateMips(IImage image, ReadOnlySpan<byte> baseLevelData)
+    public void CopyImageToBuffer(IImage imgSrc, IBuffer bufDst, ImageBufferCopyRegion region)
     {
-        D3DImage img = (D3DImage)image;
-        if (img.MipLevels <= 1)
-        {
-            return;
-        }
-
-        if (img.SampleCount > 1)
-        {
-            throw new InvalidOperationException("Cannot generate mips for a multisampled image!");
-        }
-
-        if (!IsByteUNormFormat(img.Format))
-        {
-            Logger.AppendWarn($"Software mip generation currently only supports 8-bit-per-channel UNorm formats " +
-                $"(R8UNorm/R8G8UNorm/R8G8B8A8UNorm/R8G8B8A8UNormSrgb), got {img.Format}.");
-
-            return;
-        }
-
-        uint bpp = D3DUtilities.GetBytesPerPixel(img.Format);
-        byte[] currentLevel = baseLevelData.ToArray();
-        uint currentWidth = img.Width;
-        uint currentHeight = img.Height;
-
-        for (uint mip = 1; mip < img.MipLevels; mip++)
-        {
-            byte[] nextLevel = DownsampleBox2x2(currentLevel, currentWidth, currentHeight, bpp, out uint nextWidth, out uint nextHeight);
-            UploadMipLevel(img, mip, nextLevel, nextWidth, nextHeight);
-
-            currentLevel = nextLevel;
-            currentWidth = nextWidth;
-            currentHeight = nextHeight;
-        }
+        throw new NotImplementedException("TODO: Image copying to buffer is not implemented on either backend yet!");
     }
 
-    public unsafe IBuffer CreateBuffer(BufferDescription bufDesc)
+    public IBuffer CreateBuffer(BufferDescription bufDesc)
     {
         const BufferUsage knownFlags = BufferUsage.Vertex | BufferUsage.Index | BufferUsage.Constant | BufferUsage.Storage | BufferUsage.Indirect | BufferUsage.CopySource;
 
@@ -1076,36 +960,8 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
 
         return (IBuffer)buffer;
     }
-    public unsafe (IBuffer arena, ulong offset) SuballocateConstantBuffer(ReadOnlySpan<byte> data)
-    {
-        uint lane = _frameIndex;
-        ulong aligned = (_cbufferArenaCursor[lane] + 255) & ~255ul;
 
-        if (aligned + (ulong)data.Length > _cbufferArenaCapacity)
-        {
-            // Arena exhausted for this frame-lane. Rather than fail the draw, fall back to a
-            // one-off dedicated buffer. Write a warning though, because 4mb is kind of a lot
-            // for simple data.
-            Logger.AppendWarn(
-                $"Constant buffer arena exhausted for frame lane {lane} (needed {data.Length} more " +
-                $"bytes on top of {_cbufferArenaCursor[lane]} already used this frame, budget is " +
-                $"{_cbufferArenaCapacity}). Falling back to a dedicated buffer for this bind - " +
-                "consider raising _cbufferArenaCapacity if this happens often.");
-
-            ulong paddedSize = ((ulong)data.Length + 255) & ~255ul;
-            D3DBuffer fallback = new D3DBuffer(_allocator, paddedSize, BufferType.Upload, BufferUsage.Constant);
-            UpdateBuffer(fallback, data, 0);
-            _cbufferOverflowBuffers[lane].Add(fallback);
-
-            return (fallback, 0);
-        }
-
-        data.CopyTo(new Span<byte>((byte*)_cbufferArenaMapped[lane] + aligned, data.Length));
-        _cbufferArenaCursor[lane] = aligned + (ulong)data.Length;
-        return (_cbufferArenas[lane], aligned);
-    }
-
-    public unsafe IImage CreateImage(ImageDescription imgDesc)
+    public IImage CreateImage(ImageDescription imgDesc)
     {
         const ImageUsage knownFlags = ImageUsage.Sampled | ImageUsage.Storage | ImageUsage.RenderTarget | ImageUsage.DepthStencil;
 
@@ -1285,34 +1141,71 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
         return (IComputeState)cmpState;
     }
 
-    protected override void Dispose(bool disposing)
+    // Because some TWAT at microsoft decided they didnt want hardware implementations anymore...
+    // We get to do it ourselves.
+    public void GenerateMipmaps(IImage image, ReadOnlySpan<byte> baseLevelData)
+    {
+        D3DImage img = (D3DImage)image;
+
+        if (img.MipLevels <= 1)
+        {
+            return;
+        }
+
+        if (img.SampleCount > 1)
+        {
+            throw new InvalidOperationException("Cannot generate mips for a multisampled image!");
+        }
+
+        if (!(img.Format is ImageFormat.R8UNorm or ImageFormat.R8G8UNorm or ImageFormat.R8G8B8A8UNorm or ImageFormat.R8G8B8A8UNormSrgb))
+        {
+            Logger.AppendWarn($"Software mip generation currently only supports 8-bit-per-channel UNorm formats " +
+                $"(R8UNorm/R8G8UNorm/R8G8B8A8UNorm/R8G8B8A8UNormSrgb), got {img.Format}.");
+
+            return;
+        }
+
+        uint bpp = D3DUtilities.GetBytesPerPixel(img.Format);
+        byte[] currentLevel = baseLevelData.ToArray();
+        uint currentWidth = img.Width;
+        uint currentHeight = img.Height;
+
+        for (uint i = 1; i < img.MipLevels; i++)
+        {
+            byte[] nextLevel = MipDownsampleBox(currentLevel, currentWidth, currentHeight, bpp, out uint nextWidth, out uint nextHeight);
+            MipUploadLevel(img, i, nextLevel, nextWidth, nextHeight);
+
+            currentLevel = nextLevel;
+            currentWidth = nextWidth;
+            currentHeight = nextHeight;
+        }
+    }
+    protected override unsafe void Dispose(bool disposing)
     {
         if (disposing)
         {
             // just in case
             WaitForGPU();
 
-            unsafe
+            if (_cbufferArenas != null)
             {
-                if (_cbufferArenas != null)
+                for (int i = 0; i < _cbufferArenas.Length; i++)
                 {
-                    for (int lane = 0; lane < _cbufferArenas.Length; lane++)
-                    {
-                        _cbufferArenas[lane].Resource->Unmap(0, null);
-                        _cbufferArenas[lane].Dispose();
+                    _cbufferArenas[i].Resource->Unmap(0, null);
+                    _cbufferArenas[i].Dispose();
 
-                        foreach (D3DBuffer overflow in _cbufferOverflowBuffers[lane])
-                        {
-                            overflow.Dispose();
-                        }
+                    foreach (var o in _cbufferOverflowBuffers[i])
+                    {
+                        o.Dispose();
                     }
                 }
             }
-            foreach (var laneList in _cbufferOverflowBuffers)
+
+            foreach (var l in _cbufferOverflowBuffers)
             {
-                foreach (var buf in laneList)
+                foreach (var b in l)
                 {
-                    buf.Dispose();
+                    b.Dispose();
                 }
             }
 
@@ -1324,7 +1217,12 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
             _dxgiInfoQueue.Dispose();
             _cmdQueue.Dispose();
             _mainCmdList.Dispose();
-            foreach (var a in _mainCmdAllocs) a.Dispose();
+
+            foreach (var a in _mainCmdAllocs)
+            {
+                a.Dispose();
+            }
+
             _renderHeap.Dispose();
             _resourceHeap.Dispose();
             _samplerHeap.Dispose();
@@ -1461,6 +1359,69 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
         SetScissor(Vector2.Zero, size);
     }
 
+    private unsafe void ResizeSwapchain(int width, int height)
+    {
+        if ((uint)width == _swapWidth && (uint)height == _swapHeight)
+        {
+            return;
+        }
+
+        WaitForGPU();
+
+        for (uint i = 0; i < _frameCount; i++)
+        {
+            _backBuffers[i].Dispose();
+        }
+
+        SwapChainDescription1 desc;
+        _swapChain.Get()->GetDesc1(&desc);
+
+        if (_swapChain.Get()->ResizeBuffers(_frameCount, (uint)width, (uint)height, desc.Format, desc.Flags) != HResult.Ok)
+        {
+            FlushD3DInfoQueue();
+            FlushDXGIInfoQueue();
+            throw new InvalidOperationException("Failed to resize D3D swap chain buffers!");
+        }
+
+        ID3D12Resource** backBuffers = stackalloc ID3D12Resource*[(int)_frameCount];
+
+        for (uint i = 0; i < _frameCount; i++)
+        {
+            fixed (Guid* gptr = &ID3D12Resource.IID_ID3D12Resource)
+            {
+                if (_swapChain.Get()->GetBuffer(i, gptr, (void**)&backBuffers[i]) != HResult.Ok)
+                {
+                    throw new InvalidOperationException("Failed to re-acquire D3D back buffers after resize!");
+                }
+            }
+        }
+
+        RenderTargetViewDescription targDesc = new RenderTargetViewDescription()
+        {
+            Format = Format.R8G8B8A8Unorm,
+            ViewDimension = RtvDimension.Texture2D
+        };
+
+        CpuDescriptorHandle start = _renderHeap.Get()->GetCPUDescriptorHandleForHeapStart();
+
+        for (uint j = 0; j < _frameCount; j++)
+        {
+            CpuDescriptorHandle handle = start;
+            handle.ptr += (nuint)(j * _renderHeapSize);
+            _device.Get()->CreateRenderTargetView(backBuffers[j], &targDesc, handle);
+        }
+
+        // we are such morons
+        for (int k = 0; k < _frameCount; k++)
+        {
+            _backBuffers[k].Attach(backBuffers[k]);
+            _backBufferStates[k] = ResourceStates.Present;
+        }
+
+        _swapWidth = (uint)width;
+        _swapHeight = (uint)height;
+    }
+
     private unsafe void SetFullScissor()
     {
         Rect rect = new Rect(
@@ -1505,7 +1466,7 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
     // Plain 2x2 box filter, one byte per channel. Clamps at the edge for odd dimensions (last
     // row/column gets sampled twice rather than reading out of bounds) - a correct, unsurprising
     // downsample, nothing fancier.
-    private static byte[] DownsampleBox2x2(byte[] src, uint width, uint height, uint bytesPerPixel, out uint dstWidth, out uint dstHeight)
+    private static byte[] MipDownsampleBox(byte[] src, uint width, uint height, uint bytesPerPixel, out uint dstWidth, out uint dstHeight)
     {
         dstWidth = Math.Max(1u, width / 2);
         dstHeight = Math.Max(1u, height / 2);
@@ -1538,7 +1499,7 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
         return dst;
     }
 
-    private unsafe void UploadMipLevel(D3DImage dst, uint mip, byte[] tightlyPackedPixels, uint width, uint height)
+    private unsafe void MipUploadLevel(D3DImage dst, uint mip, byte[] tightlyPackedPixels, uint width, uint height)
     {
         ResourceDescription desc = dst.Resource->GetDesc();
 
@@ -1556,11 +1517,11 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
 
         fixed (byte* srcPtr = tightlyPackedPixels)
         {
-            for (uint row = 0; row < height; row++)
+            for (uint i = 0; i < height; i++)
             {
                 Buffer.MemoryCopy(
-                    srcPtr + row * tightRowPitch,
-                    (byte*)dstMapped + row * footprint.Footprint.RowPitch,
+                    srcPtr + i * tightRowPitch,
+                    (byte*)dstMapped + i * footprint.Footprint.RowPitch,
                     footprint.Footprint.RowPitch,
                     tightRowPitch);
             }
@@ -1593,11 +1554,6 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
 
         EndUploadAndWait();
         padded.Dispose();
-    }
-
-    private static bool IsByteUNormFormat(ImageFormat format)
-    {
-        return format is ImageFormat.R8UNorm or ImageFormat.R8G8UNorm or ImageFormat.R8G8B8A8UNorm or ImageFormat.R8G8B8A8UNormSrgb;
     }
 
     private static unsafe void BarrierTransition(ID3D12GraphicsCommandList* cmdList, ID3D12Resource* resource, ref ResourceStates current, ResourceStates target)
@@ -2148,6 +2104,25 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
         }
 
         _allocator = allocator;
+    }
+
+    private unsafe void InitBufferArenas()
+    {
+        // ...magic magic...
+        _cbufferArenas = new D3DBuffer[_maxFramesInFlight];
+        _cbufferArenaMapped = new void*[_maxFramesInFlight];
+        _cbufferArenaCursor = new ulong[_maxFramesInFlight];
+        _cbufferOverflowBuffers = new List<D3DBuffer>[_maxFramesInFlight];
+
+        for (int i = 0; i < _maxFramesInFlight; i++)
+        {
+            _cbufferArenas[i] = new D3DBuffer(_allocator, _cbufferArenaCapacity, BufferType.Upload, BufferUsage.Constant);
+            _cbufferOverflowBuffers[i] = new List<D3DBuffer>();
+
+            void* mapped;
+            _cbufferArenas[i].Resource->Map(0, null, &mapped);
+            _cbufferArenaMapped[i] = mapped;
+        }
     }
 
     private unsafe void QueryGpuInfo()
