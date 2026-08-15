@@ -6,53 +6,38 @@ using System.Text;
 using System.Threading.Tasks;
 
 namespace Chisel.Framework;
-
 public class IndexBuffer : IDisposable
 {
     public int Count { get; private set; }
-
     IGraphicsDevice device;
-    IBuffer buffer;
+    FrameLanedBuffer buffer;
     bool disposedValue;
 
     public IndexBuffer(IGraphicsDevice device, int capacity)
     {
         this.device = device;
-        buffer = device.CreateBuffer(new BufferDescription
-        {
-            Size = (ulong)(capacity * sizeof(uint)),
-            Type = BufferType.Upload,
-            Usage = BufferUsage.Index,
-        });
+        buffer = new FrameLanedBuffer(device, (ulong)(capacity * sizeof(uint)), BufferType.Upload, BufferUsage.Index);
     }
 
     public void SetData(ReadOnlySpan<uint> data)
     {
-        ReadOnlySpan<byte> bytes = MemoryMarshal.AsBytes(data);
-        device.UpdateBuffer(buffer, bytes, 0);
+        buffer.Write(MemoryMarshal.AsBytes(data), 0);
         Count = data.Length;
     }
 
     public void Bind()
     {
-        device.BindIndexBuffer(buffer);
+        device.BindIndexBuffer(buffer.FlushBeforeBind());
     }
 
     protected virtual void Dispose(bool disposing)
     {
         if (!disposedValue)
         {
-            if (disposing && buffer is IDisposable disposableBuffer)
-            {
-                disposableBuffer.Dispose();
-            }
+            if (disposing) buffer.Dispose();
             disposedValue = true;
         }
     }
 
-    public void Dispose()
-    {
-        Dispose(true);
-        GC.SuppressFinalize(this);
-    }
+    public void Dispose() { Dispose(true); GC.SuppressFinalize(this); }
 }

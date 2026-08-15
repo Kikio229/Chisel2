@@ -234,6 +234,8 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
 
         FlushD3DInfoQueue();
 
+        // oops i forgot that
+        _mainFenceValue++;
         _cmdQueue.Get()->Signal((ID3D12Fence*)_mainFence.Get(), _mainFenceValue);
         _frameFenceValues[_frameIndex] = _mainFenceValue;
 
