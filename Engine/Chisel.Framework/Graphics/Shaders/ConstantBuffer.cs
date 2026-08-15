@@ -14,11 +14,17 @@ public class ConstantBuffer : IDisposable
     bool dirty;
     bool disposedValue;
 
-    // On D3D12 a command list is recorded now but only executed later, at EndFrame.
     readonly bool useRing;
-    IBuffer[] ring;
-    int ringCount;   // how many slots are actually allocated
-    int ringIndex = -1;
+    IBuffer nonRingBuffer; // GL path only: single reused buffer, driver-orphaning handles the rest
+
+    // D3D path only: one independent slot list + write-cursor per frame-in-flight lane. A lane
+    // maps 1:1 to D3DGraphicsDevice's back-buffer index. Reusing lane N's slots is only safe once
+    // BeginFrame has already fence-waited for lane N's prior GPU work to finish - which the device
+    // already guarantees has happened by the time FlushAndBind can be called again for that lane.
+    const int MaxLanes = 2; // matches D3DGraphicsDevice's _maxFramesInFlight
+    IBuffer[][] laneRings;
+    int[] lanePositions;
+    uint lastSeenFrameIndex = uint.MaxValue;
 
     internal IGraphicsDevice GraphicsDevice;
 
@@ -29,17 +35,25 @@ public class ConstantBuffer : IDisposable
         GraphicsDevice = device;
         data = new byte[sizeInBytes];
 
-        // Only D3D actually needs the ring. GL's driver-level orphaning already gives correct
-        // per-draw semantics with a single buffer
         useRing = device.Backend == GraphicsBackend.Direct3D12;
 
-        ring = new IBuffer[useRing ? 4 : 1]; // small initial capacity, grows on demand
-        AllocateRingSlot(0);
-        ringCount = 1;
-        ringIndex = 0;
+        if (useRing)
+        {
+            laneRings = new IBuffer[MaxLanes][];
+            lanePositions = new int[MaxLanes];
+
+            for (int lane = 0; lane < MaxLanes; lane++)
+            {
+                laneRings[lane] = Array.Empty<IBuffer>();
+            }
+        }
+        else
+        {
+            nonRingBuffer = AllocateSlot();
+        }
     }
 
-    IBuffer AllocateRingSlot(int index)
+    IBuffer AllocateSlot()
     {
         IBuffer buffer = GraphicsDevice.CreateBuffer(new BufferDescription
         {
@@ -48,7 +62,6 @@ public class ConstantBuffer : IDisposable
             Usage = BufferUsage.Constant,
         });
         GraphicsDevice.UpdateBuffer(buffer, data, 0);
-        ring[index] = buffer;
         return buffer;
     }
 
@@ -71,29 +84,36 @@ public class ConstantBuffer : IDisposable
 
         if (useRing)
         {
-            // Every bind is a distinct logical use of this cbuffer's current bytes, so always advance
-            // to a fresh physical slot
-            ringIndex++;
+            uint frameIndex = GraphicsDevice.CurrentFrameIndex;
 
-            if (ringIndex >= ringCount)
+            if (frameIndex != lastSeenFrameIndex)
             {
-                if (ringIndex >= ring.Length)
-                {
-                    Array.Resize(ref ring, ring.Length * 2);
-                }
+                lastSeenFrameIndex = frameIndex;
+                lanePositions[frameIndex] = 0;
+            }
 
-                target = AllocateRingSlot(ringIndex);
-                ringCount = ringIndex + 1;
+            IBuffer[] lane = laneRings[frameIndex];
+            int slotIndex = lanePositions[frameIndex]++;
+
+            if (slotIndex >= lane.Length)
+            {
+                // Only grows the first time this lane needs this many binds in a single frame -
+                // once steady state is reached (same call count every frame), this stops firing
+                // entirely and every later frame just reuses the same physical buffers.
+                Array.Resize(ref lane, slotIndex + 1);
+                lane[slotIndex] = AllocateSlot();
+                laneRings[frameIndex] = lane;
             }
             else
             {
-                target = ring[ringIndex];
-                GraphicsDevice.UpdateBuffer(target, data, 0);
+                GraphicsDevice.UpdateBuffer(lane[slotIndex], data, 0);
             }
+
+            target = lane[slotIndex];
         }
         else
         {
-            target = ring[0];
+            target = nonRingBuffer;
 
             if (dirty)
             {
@@ -112,12 +132,19 @@ public class ConstantBuffer : IDisposable
             return;
         }
 
-        for (int i = 0; i < ringCount; i++)
+        if (useRing)
         {
-            if (ring[i] is IDisposable disposableBuffer)
+            foreach (IBuffer[] lane in laneRings)
             {
-                disposableBuffer.Dispose();
+                foreach (IBuffer buffer in lane)
+                {
+                    (buffer as IDisposable)?.Dispose();
+                }
             }
+        }
+        else
+        {
+            (nonRingBuffer as IDisposable)?.Dispose();
         }
 
         disposedValue = true;

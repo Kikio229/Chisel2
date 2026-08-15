@@ -21,6 +21,8 @@ namespace Chisel.Framework;
 public class D3DGraphicsDevice : Disposable, IGraphicsDevice
 {
     public GraphicsBackend Backend => GraphicsBackend.Direct3D12;
+    public uint CurrentFrameIndex => _currentFrameIndex;
+    public uint BufferingCount => _maxFramesInFlight;
 
     private uint _renderHeapSize, _frameCount;
     private ulong _fenceValue;
@@ -36,28 +38,37 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
     private const uint _rpSamplers = 4;
 
     // Layout of _resourceHeap
-    // this is tracking where shit goes when we draw, basically our dynamic memory layout for rendering
-    // this implementation could probably be faster and smarter, but idgaf.
-    private const uint _drawsPerFrameCapacity = 256; // bump-allocator budget
-    private const uint _samplerDrawsPerFrameCapacity = 128; // sampler heap has a hard platform cap of 2048
-                                                            // shader-visible descriptors (128 * 16 = 2048),
-                                                            // independent of the CbvSrvUav heap's much larger limit
+    private const uint _drawsPerFrameCapacity = 256;       // bump-allocator budget, PER frame-in-flight
+    private const uint _samplerDrawsPerFrameCapacity = 64; // per frame-in-flight - halved from 128, see note below
     private const uint _cbvRangeSize = 16, _srvRangeSize = 16, _uavRangeSize = 16, _samplerRangeSize = 16;
 
-    private const uint _cbvRegionStart = 0;
-    private const uint _srvRegionStart = _cbvRegionStart + _drawsPerFrameCapacity * _cbvRangeSize;
-    private const uint _uavRegionStart = _srvRegionStart + _drawsPerFrameCapacity * _srvRangeSize;
-    private const uint _resourceHeapCapacity = _uavRegionStart + _drawsPerFrameCapacity * _uavRangeSize;
-    private const uint _samplerHeapCapacity = _samplerDrawsPerFrameCapacity * _samplerRangeSize;
+    private const uint _maxFramesInFlight = 2;
 
-    // Bump cursors, reset every BeginFrame (safe: EndFrame already blocks until the GPU has fully
-    // finished the previous frame, so nothing can still be reading these slots).
+    // Each region is now _maxFramesInFlight independent slices, one per back-buffer index - so a
+    // frame still executing on the GPU can never have its bound descriptors overwritten by the
+    // *next* frame's binds.
+    private const uint _cbvFrameStride = _drawsPerFrameCapacity * _cbvRangeSize;
+    private const uint _srvFrameStride = _drawsPerFrameCapacity * _srvRangeSize;
+    private const uint _uavFrameStride = _drawsPerFrameCapacity * _uavRangeSize;
+    private const uint _samplerFrameStride = _samplerDrawsPerFrameCapacity * _samplerRangeSize;
+
+    private const uint _cbvRegionStart = 0;
+    private const uint _srvRegionStart = _cbvRegionStart + _maxFramesInFlight * _cbvFrameStride;
+    private const uint _uavRegionStart = _srvRegionStart + _maxFramesInFlight * _srvFrameStride;
+    private const uint _resourceHeapCapacity = _uavRegionStart + _maxFramesInFlight * _uavFrameStride;
+    private const uint _samplerHeapCapacity = _maxFramesInFlight * _samplerFrameStride; // 2 * 64 * 16 = 2048
+
+    // Bump cursors, reset every BeginFrame - each cursor only ever walks its own frame-in-flight's
+    // slice of the heap, so resetting to 0 here is safe regardless of
+    // what the *other* frame-in-flight is still doing on the GPU.
     private uint _cbvBumpCursor, _srvBumpCursor, _uavBumpCursor, _samplerBumpCursor;
 
     // The block this draw's BindConstantBuffer/BindImage/BindSampler calls should write into
     // set by BindGraphicsState (or BindComputeState), consumed by the three Bind* methods below.
     private uint _currentCbvBase, _currentSrvBase, _currentUavBase, _currentSamplerBase;
     private bool _hasAllocatedDescriptorBlock;
+
+    private static long _liveImageCreates, _liveBufferCreates, _liveGraphicsStateCreates;
 
     private D3DGraphicsState? _boundGfxState;
     private D3DComputeState? _boundCmpState;
@@ -123,7 +134,7 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
 
     public D3DGraphicsDevice(bool debug)
     {
-        _frameCount = 2;
+        _frameCount = _maxFramesInFlight;
         _fenceValue = 0;
         _frameFenceValues = new ulong[_frameCount];
         _fenceEvent = new AutoResetEvent(false);
@@ -611,13 +622,16 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
     public void DispatchIndirect(IBuffer buffer, ulong offset)
         => throw new NotImplementedException("Compute is not implemented on either backend yet.");
 
+    private readonly CpuDescriptorHandle[] _singleRtvScratch = new CpuDescriptorHandle[1];
+
     private unsafe CpuDescriptorHandle[] CurrentRtvHandles()
     {
         if (_currentTarget == null)
         {
             CpuDescriptorHandle rtv = _renderHeap.Get()->GetCPUDescriptorHandleForHeapStart();
             rtv.ptr += (nuint)(_currentFrameIndex * _renderHeapSize);
-            return new[] { rtv };
+            _singleRtvScratch[0] = rtv;
+            return _singleRtvScratch;
         }
 
         return _currentTarget.RtvHandles ?? Array.Empty<CpuDescriptorHandle>();
@@ -912,20 +926,25 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
     // This is used for samplers, textures, etc.
     private void AllocateDescriptorBlockForDraw()
     {
-        if (_cbvBumpCursor + _cbvRangeSize > _drawsPerFrameCapacity * _cbvRangeSize
-            || _srvBumpCursor + _srvRangeSize > _drawsPerFrameCapacity * _srvRangeSize
-            || _uavBumpCursor + _uavRangeSize > _drawsPerFrameCapacity * _uavRangeSize
-            || _samplerBumpCursor + _samplerRangeSize > _samplerDrawsPerFrameCapacity * _samplerRangeSize)
+        if (_cbvBumpCursor + _cbvRangeSize > _cbvFrameStride
+            || _srvBumpCursor + _srvRangeSize > _srvFrameStride
+            || _uavBumpCursor + _uavRangeSize > _uavFrameStride
+            || _samplerBumpCursor + _samplerRangeSize > _samplerFrameStride)
         {
             throw new InvalidOperationException(
                 $"Exceeded the per-frame descriptor budget ({_drawsPerFrameCapacity} CBV/SRV/UAV draws, {_samplerDrawsPerFrameCapacity} sampler-using draws). " +
                 "Increase the relevant capacity constant in D3DGraphicsDevice.");
         }
 
-        _currentCbvBase = _cbvRegionStart + _cbvBumpCursor;
-        _currentSrvBase = _srvRegionStart + _srvBumpCursor;
-        _currentUavBase = _uavRegionStart + _uavBumpCursor;
-        _currentSamplerBase = _samplerBumpCursor;
+        uint frameCbvBase = _cbvRegionStart + _currentFrameIndex * _cbvFrameStride;
+        uint frameSrvBase = _srvRegionStart + _currentFrameIndex * _srvFrameStride;
+        uint frameUavBase = _uavRegionStart + _currentFrameIndex * _uavFrameStride;
+        uint frameSamplerBase = _currentFrameIndex * _samplerFrameStride;
+
+        _currentCbvBase = frameCbvBase + _cbvBumpCursor;
+        _currentSrvBase = frameSrvBase + _srvBumpCursor;
+        _currentUavBase = frameUavBase + _uavBumpCursor;
+        _currentSamplerBase = frameSamplerBase + _samplerBumpCursor;
 
         _cbvBumpCursor += _cbvRangeSize;
         _srvBumpCursor += _srvRangeSize;
@@ -1151,6 +1170,13 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
         }
 
         D3DBuffer buffer = new D3DBuffer(_allocator, size, bufDesc.Type, bufDesc.Usage);
+
+        if (_isDebug)
+        {
+            System.Threading.Interlocked.Increment(ref _liveBufferCreates);
+            Logger.AppendLog("D3D", $"CreateBuffer #{_liveBufferCreates}", ConsoleColor.Gray, 2);
+        }
+
         return (IBuffer)buffer;
     }
 
@@ -1166,6 +1192,13 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
 
         if (imgDesc.SampleCount > 1 && imgDesc.Usage.HasFlag(ImageUsage.Sampled)) throw new ArgumentException("Multisampled images cannot be sampled directly. Resolve to a single-sample image first.");
         D3DImage image = new D3DImage(_allocator, imgDesc.Width, imgDesc.Height, imgDesc.MipLevels, imgDesc.Format, imgDesc.Usage, imgDesc.SampleCount == 0 ? 1u : imgDesc.SampleCount);
+
+        if (_isDebug)
+        {
+            System.Threading.Interlocked.Increment(ref _liveImageCreates);
+            Logger.AppendLog("D3D", $"CreateImage #{_liveImageCreates} ({imgDesc.Width}x{imgDesc.Height})", ConsoleColor.Gray, 2);
+        }
+
         return (IImage)image;
     }
     public ISampler CreateSampler(SamplerDescription smpDesc)
@@ -1260,6 +1293,10 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
         D3DGraphicsState gfxState = new D3DGraphicsState((ID3D12Device*)_device.Get(), (D3DShader?)gfxDesc.VertexShader, (D3DShader?)gfxDesc.PixelShader,
                         gfxDesc.ColorFormats, gfxDesc.DepthStencilFormat, gfxDesc.Topology, gfxDesc.DepthMode, gfxDesc.BlendMode, gfxDesc.CullMode,
                         gfxDesc.FillMode, gfxDesc.VertexLayout, gfxDesc.AllowDepthWrite, gfxDesc.SampleCount == 0 ? 1u : gfxDesc.SampleCount);
+
+        System.Threading.Interlocked.Increment(ref _liveGraphicsStateCreates);
+        Logger.AppendLog("D3D", $"CreateGraphicsState #{_liveGraphicsStateCreates}", ConsoleColor.Yellow, 2);
+
         return (IGraphicsState)gfxState;
     }
 
@@ -1422,6 +1459,7 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
             _uploadCmdList.Dispose();
             _uploadCmdAlloc.Dispose();
             _uploadFence.Dispose();
+            _dxgiInfoQueue.Dispose();
 
             foreach (var b in _backBuffers)
             {
@@ -1521,6 +1559,7 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
 
             if ((desc.Flags & AdapterFlags.Software) != 0)
             {
+                tempAdp->Release();
                 continue;
             }
 

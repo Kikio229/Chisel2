@@ -10,6 +10,8 @@ public interface IGraphicsDevice
     ImageFormat[] CurrentColorFormats { get; }
     ImageFormat? CurrentDepthStencilFormat { get; }
     uint CurrentSampleCount { get; }
+    uint CurrentFrameIndex { get; }
+    uint BufferingCount { get; }
 
     void BeginFrame();
     void EndFrame();

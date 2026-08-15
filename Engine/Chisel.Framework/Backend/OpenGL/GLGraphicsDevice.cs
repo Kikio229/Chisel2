@@ -21,8 +21,10 @@ public class GLGraphicsDevice : Disposable, IGraphicsDevice
     static extern nint GetProcAddress(nint module, string procName);
 #endif
 
-    public GraphicsBackend Backend => GraphicsBackend.OpenGL;
-    public float MaxDepth => 1f;
+    public GraphicsBackend Backend => GraphicsBackend.OpenGL; 
+    // this doesnt really matter on GL
+    public uint CurrentFrameIndex => 0;
+    public uint BufferingCount => 2;
 
     internal GL gl;
     internal SDLGLContext glCTX;
