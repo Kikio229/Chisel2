@@ -2,7 +2,7 @@
   <Folder Name="/Engine/">
     <Project Path="Engine/Chisel.Framework/Chisel.Framework.csproj" />
     <Project Path="Engine/Chisel.Resource.Builder/Chisel.Resource.Builder.csproj" />
-    <Project Path="Engine/Chisel/Chisel.csproj" Id="34dccec1-f704-4f32-8619-e45298987c00" />
+    <Project Path="Engine/Chisel2/Chisel2.csproj" />
   </Folder>
   <Folder Name="/Projects/">
     <Project Path="Projects/DXTest/DXTest.csproj" />
