@@ -1,8 +1,6 @@
 ﻿using Chisel.Framework;
-using Chisel.Framework.ImGUI;
 using Chisel.Framework.Utilities;
 using Chisel.Resource;
-using ImGuiNET;
 using Microsoft.Xna.Framework;
 using System.Runtime.InteropServices;
 

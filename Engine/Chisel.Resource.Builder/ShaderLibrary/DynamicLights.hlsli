@@ -48,7 +48,7 @@ float3 ApplyRealtimeLights(float3 baseColor, float3 normal, float3 worldPosition
             atten *= sqrt(saturate(spotAngle - angle) / spotAngle);
         }
 
-        result += RealtimeLightColors[i].rgb * RealtimeLightColors[i].a * atten;
+        result += RealtimeLightColors[i].rgb * RealtimeLightColors[i].a * atten * atten;
     }
 
     return result;

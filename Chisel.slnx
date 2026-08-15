@@ -6,6 +6,7 @@
   </Folder>
   <Folder Name="/Projects/">
     <Project Path="Projects/DXTest/DXTest.csproj" />
+    <Project Path="Projects/GeneralPlayground/GeneralPlayground.csproj" Id="f833433a-f0c3-4375-93ba-48a8519f5a52" />
     <Project Path="Projects/GLTest/GLTest.csproj" />
     <Project Path="Projects/UITests/UITests.csproj" />
   </Folder>
