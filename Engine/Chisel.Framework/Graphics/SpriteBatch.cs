@@ -1,5 +1,7 @@
 ﻿using Chisel.Framework;
+using Chisel.Framework.UI;
 using Chisel.Resource;
+using FontStashSharp;
 using Microsoft.Xna.Framework;
 using Silk.NET.OpenGL;
 using System;
@@ -19,15 +21,9 @@ public struct SpriteVertex
 
 public class SpriteBatch : IDisposable
 {
-    struct QueuedSprite
+    struct QueuedQuad
     {
-        public Vector2 Position;
-        public Vector2 Size;
-        public Vector4 Color;
-        public Vector2 UVMin;
-        public Vector2 UVMax;
-        public float Rotation;
-        public Vector2 Origin;
+        public SpriteVertex V0, V1, V2, V3;
     }
 
     IGraphicsDevice device;
@@ -40,11 +36,17 @@ public class SpriteBatch : IDisposable
 
     VertexBuffer<SpriteVertex> vertexBuffer;
     IndexBuffer indexBuffer;
-    List<QueuedSprite> sprites = new List<QueuedSprite>();
+    List<QueuedQuad> quads = new List<QueuedQuad>();
+
+    FFRenderer2 fontRenderer;
+    FontSystem fontSystem;
 
     Texture2D currentTexture;
     Rectangle? currentClip;
     int capacity;
+    int vertexCapacity;
+    int frameVertexOffset;
+    List<VertexBuffer<SpriteVertex>> pendingVertexBufferDisposal = new List<VertexBuffer<SpriteVertex>>();
     bool disposedValue;
 
     public SpriteBatch(IGraphicsDevice device, ContentManager content, int initialCapacity = 256)
@@ -52,6 +54,7 @@ public class SpriteBatch : IDisposable
         this.device = device;
         shader = content.Load<ShaderEffect>("Shaders/Sprite");
         capacity = initialCapacity;
+        vertexCapacity = capacity * 4;
 
         viewProjectionParam = shader.Parameters["ViewProjection"];
         textureParam = shader.Parameters["DiffuseTexture"];
@@ -74,6 +77,11 @@ public class SpriteBatch : IDisposable
 
         vertexBuffer = new VertexBuffer<SpriteVertex>(device, capacity * 4);
         indexBuffer = new IndexBuffer(device, capacity * 6);
+
+        fontRenderer = new FFRenderer2(this);
+        fontSystem = new FontSystem();
+        fontSystem.AddFont(content.LoadBytes("Fonts/default.ttf"));
+
         BuildIndices(capacity);
     }
 
@@ -98,12 +106,25 @@ public class SpriteBatch : IDisposable
     }
     public void Begin(Matrix viewProjection)
     {
-        sprites.Clear();
+        foreach (VertexBuffer<SpriteVertex> old in pendingVertexBufferDisposal)
+        {
+            old.Dispose();
+        }
+        pendingVertexBufferDisposal.Clear();
+
+        frameVertexOffset = 0;
+        quads.Clear();
         currentTexture = null;
         currentClip = null;
         viewProjectionParam.SetValue(viewProjection);
 
         device.Clear(GraphicsClearFlags.Depth, Color.Black, 1.0f, 0);
+    }
+    public void DrawString(string text, int fontSize, Vector2 position, Color color)
+    {
+        var fnt = fontSystem.GetFont(fontSize);
+
+        fnt.DrawText(fontRenderer, text, position.ToNumerics(), new FSColor(color.R, color.G, color.B, color.A));
     }
     public void Draw(Texture2D texture, Vector2 position, Vector2 size, Color color, Rectangle? sourceRectangle = null, float rotation = 0f, Vector2 origin = default)
     {
@@ -152,23 +173,55 @@ public class SpriteBatch : IDisposable
     }
     void QueueSprite(Texture2D texture, Vector2 position, Vector2 size, Color color, Vector2 uvMin, Vector2 uvMax, float rotation, Vector2 origin)
     {
+        Vector4 col = color.ToVector4();
+
+        Vector2 local0 = Vector2.Zero;
+        Vector2 local1 = new Vector2(size.X, 0);
+        Vector2 local2 = new Vector2(size.X, size.Y);
+        Vector2 local3 = new Vector2(0, size.Y);
+
+        Vector2 p0, p1, p2, p3;
+
+        if (rotation == 0f)
+        {
+            Vector2 offset = position - origin;
+            p0 = local0 + offset;
+            p1 = local1 + offset;
+            p2 = local2 + offset;
+            p3 = local3 + offset;
+        }
+        else
+        {
+            float sin = MathF.Sin(rotation);
+            float cos = MathF.Cos(rotation);
+
+            p0 = RotateAndPlace(local0, origin, position, sin, cos);
+            p1 = RotateAndPlace(local1, origin, position, sin, cos);
+            p2 = RotateAndPlace(local2, origin, position, sin, cos);
+            p3 = RotateAndPlace(local3, origin, position, sin, cos);
+        }
+
+        AddQuad(texture,
+            new SpriteVertex { Position = new Vector3(p0.X, p0.Y, 0), UV = new Vector2(uvMin.X, uvMin.Y), Color = col },
+            new SpriteVertex { Position = new Vector3(p1.X, p1.Y, 0), UV = new Vector2(uvMax.X, uvMin.Y), Color = col },
+            new SpriteVertex { Position = new Vector3(p2.X, p2.Y, 0), UV = new Vector2(uvMax.X, uvMax.Y), Color = col },
+            new SpriteVertex { Position = new Vector3(p3.X, p3.Y, 0), UV = new Vector2(uvMin.X, uvMax.Y), Color = col });
+    }
+
+    public void DrawQuad(Texture2D texture, SpriteVertex v0, SpriteVertex v1, SpriteVertex v2, SpriteVertex v3)
+    {
+        AddQuad(texture, v0, v1, v2, v3);
+    }
+
+    void AddQuad(Texture2D texture, SpriteVertex v0, SpriteVertex v1, SpriteVertex v2, SpriteVertex v3)
+    {
         if (currentTexture != null && currentTexture != texture)
         {
             Flush();
         }
 
         currentTexture = texture;
-
-        sprites.Add(new QueuedSprite
-        {
-            Position = position,
-            Size = size,
-            Color = color.ToVector4(),
-            UVMin = uvMin,
-            UVMax = uvMax,
-            Rotation = rotation,
-            Origin = origin,
-        });
+        quads.Add(new QueuedQuad { V0 = v0, V1 = v1, V2 = v2, V3 = v3 });
     }
     public void End()
     {
@@ -177,57 +230,37 @@ public class SpriteBatch : IDisposable
 
     void Flush()
     {
-        if (sprites.Count == 0 || currentTexture == null)
+        if (quads.Count == 0 || currentTexture == null)
         {
-            sprites.Clear();
+            quads.Clear();
             return;
         }
 
-        if (sprites.Count > capacity)
+        if (quads.Count > capacity)
         {
-            Grow(sprites.Count);
+            GrowIndices(quads.Count);
         }
 
-        SpriteVertex[] vertices = new SpriteVertex[sprites.Count * 4];
+        int neededVertices = frameVertexOffset + quads.Count * 4;
 
-        for (int i = 0; i < sprites.Count; i++)
+        if (neededVertices > vertexCapacity)
         {
-            QueuedSprite sprite = sprites[i];
+            GrowVertexBuffer(neededVertices);
+        }
+
+        SpriteVertex[] vertices = new SpriteVertex[quads.Count * 4];
+
+        for (int i = 0; i < quads.Count; i++)
+        {
+            QueuedQuad q = quads[i];
             int v = i * 4;
-
-            Vector2 local0 = new Vector2(0, 0);
-            Vector2 local1 = new Vector2(sprite.Size.X, 0);
-            Vector2 local2 = new Vector2(sprite.Size.X, sprite.Size.Y);
-            Vector2 local3 = new Vector2(0, sprite.Size.Y);
-
-            Vector2 p0, p1, p2, p3;
-
-            if (sprite.Rotation == 0f)
-            {
-                Vector2 offset = sprite.Position - sprite.Origin;
-                p0 = local0 + offset;
-                p1 = local1 + offset;
-                p2 = local2 + offset;
-                p3 = local3 + offset;
-            }
-            else
-            {
-                float sin = MathF.Sin(sprite.Rotation);
-                float cos = MathF.Cos(sprite.Rotation);
-
-                p0 = RotateAndPlace(local0, sprite.Origin, sprite.Position, sin, cos);
-                p1 = RotateAndPlace(local1, sprite.Origin, sprite.Position, sin, cos);
-                p2 = RotateAndPlace(local2, sprite.Origin, sprite.Position, sin, cos);
-                p3 = RotateAndPlace(local3, sprite.Origin, sprite.Position, sin, cos);
-            }
-
-            vertices[v + 0] = new SpriteVertex { Position = new Vector3(p0.X, p0.Y, 0), UV = new Vector2(sprite.UVMin.X, sprite.UVMin.Y), Color = sprite.Color };
-            vertices[v + 1] = new SpriteVertex { Position = new Vector3(p1.X, p1.Y, 0), UV = new Vector2(sprite.UVMax.X, sprite.UVMin.Y), Color = sprite.Color };
-            vertices[v + 2] = new SpriteVertex { Position = new Vector3(p2.X, p2.Y, 0), UV = new Vector2(sprite.UVMax.X, sprite.UVMax.Y), Color = sprite.Color };
-            vertices[v + 3] = new SpriteVertex { Position = new Vector3(p3.X, p3.Y, 0), UV = new Vector2(sprite.UVMin.X, sprite.UVMax.Y), Color = sprite.Color };
+            vertices[v + 0] = q.V0;
+            vertices[v + 1] = q.V1;
+            vertices[v + 2] = q.V2;
+            vertices[v + 3] = q.V3;
         }
 
-        vertexBuffer.SetData(vertices);
+        vertexBuffer.SetData(vertices, frameVertexOffset);
 
         device.BindGraphicsState(pipelineState);
 
@@ -250,14 +283,12 @@ public class SpriteBatch : IDisposable
             device.SetScissorEnabled(false);
         }
 
-        device.DrawIndexed((uint)(sprites.Count * 6));
+        device.DrawIndexed((uint)(quads.Count * 6), 0, frameVertexOffset);
 
-        sprites.Clear();
+        frameVertexOffset += quads.Count * 4;
+        quads.Clear();
     }
 
-    // Rotates a local corner around `origin` by the given sin/cos, then places it in world
-    // space such that `origin` itself lands on `position`. With origin = Vector2.Zero this
-    // reduces to `local + position`, matching the pre-rotation behavior exactly.
     static Vector2 RotateAndPlace(Vector2 local, Vector2 origin, Vector2 position, float sin, float cos)
     {
         Vector2 fromOrigin = local - origin;
@@ -266,19 +297,30 @@ public class SpriteBatch : IDisposable
         return new Vector2(x, y) + position;
     }
 
-    void Grow(int minimumCapacity)
+    void GrowIndices(int minimumQuadCapacity)
     {
-        while (capacity < minimumCapacity)
+        while (capacity < minimumQuadCapacity)
         {
             capacity *= 2;
         }
 
-        vertexBuffer.Dispose();
         indexBuffer.Dispose();
-
-        vertexBuffer = new VertexBuffer<SpriteVertex>(device, capacity * 4);
         indexBuffer = new IndexBuffer(device, capacity * 6);
         BuildIndices(capacity);
+    }
+
+    void GrowVertexBuffer(int minimumVertexCapacity)
+    {
+        int newCapacity = vertexCapacity;
+
+        while (newCapacity < minimumVertexCapacity)
+        {
+            newCapacity *= 2;
+        }
+
+        pendingVertexBufferDisposal.Add(vertexBuffer);
+        vertexBuffer = new VertexBuffer<SpriteVertex>(device, newCapacity);
+        vertexCapacity = newCapacity;
     }
 
     protected virtual void Dispose(bool disposing)

@@ -1044,7 +1044,67 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
         EndUploadAndWait();
         padded.Dispose();
     }
+    public unsafe void CopyBufferToImage(IBuffer bufSrc, IImage imgDst, ImageCopyRegion region)
+    {
+        D3DBuffer src = (D3DBuffer)bufSrc;
+        D3DImage dst = (D3DImage)imgDst;
 
+        ResourceDescription desc = dst.Resource->GetDesc();
+        desc.Width = region.Width;
+        desc.Height = region.Height;
+
+        PlacedSubresourceFootprint footprint = default;
+        ulong totalBytes;
+        _device.Get()->GetCopyableFootprints(&desc, 0, 1, 0, &footprint, null, null, &totalBytes);
+
+        uint tightRowPitch = region.Width * D3DUtilities.GetBytesPerPixel(dst.Format);
+        ulong paddedSize = footprint.Footprint.RowPitch * (ulong)footprint.Footprint.Height;
+
+        D3DBuffer padded = new D3DBuffer(_allocator, paddedSize, BufferType.Upload, BufferUsage.CopySource);
+
+        void* srcMapped;
+        void* dstMapped;
+        src.Resource->Map(0, null, &srcMapped);
+        padded.Resource->Map(0, null, &dstMapped);
+
+        for (uint row = 0; row < region.Height; row++)
+        {
+            Buffer.MemoryCopy(
+                (byte*)srcMapped + region.BufferOffset + row * tightRowPitch,
+                (byte*)dstMapped + row * footprint.Footprint.RowPitch,
+                footprint.Footprint.RowPitch,
+                tightRowPitch);
+        }
+
+        padded.Resource->Unmap(0, null);
+        src.Resource->Unmap(0, null);
+
+        ID3D12GraphicsCommandList6* cmdList = BeginUpload();
+
+        Transition(cmdList, dst.Resource, ref dst.State, ResourceStates.CopyDest);
+
+        TextureCopyLocation dstLoc = new TextureCopyLocation
+        {
+            pResource = dst.Resource,
+            Type = TextureCopyType.SubresourceIndex,
+            Anonymous = new TextureCopyLocation._Anonymous_e__Union { SubresourceIndex = region.MipLevel }
+        };
+
+        TextureCopyLocation srcLoc = new TextureCopyLocation
+        {
+            pResource = padded.Resource,
+            Type = TextureCopyType.PlacedFootprint,
+            Anonymous = new TextureCopyLocation._Anonymous_e__Union { PlacedFootprint = footprint }
+        };
+
+        cmdList->CopyTextureRegion(&dstLoc, (uint)region.DestX, (uint)region.DestY, 0, &srcLoc, null);
+
+        ResourceStates finalState = (dst.Usage & ImageUsage.Sampled) != 0 ? ResourceStates.PixelShaderResource : ResourceStates.Common;
+        Transition(cmdList, dst.Resource, ref dst.State, finalState);
+
+        EndUploadAndWait();
+        padded.Dispose();
+    }
     public void CopyImage(IImage imgSrc, IImage imgDst)
         => throw new NotImplementedException("CopyImage is not implemented on either backend yet - see status-and-known-gaps.md.");
 

@@ -23,6 +23,24 @@ public class ContentManager
     {
         contentLoaders[typeof(T)] = loader;
     }
+    public byte[] LoadBytes(string relativePath)
+    {
+        relativePath = ContentPath.Normalize(relativePath);
+        string cacheKey = "byte[]::" + relativePath;
+
+        if (cache.TryGetValue(cacheKey, out object cached))
+        {
+            return (byte[])cached;
+        }
+
+        using Stream stream = source.Open(relativePath);
+        using MemoryStream memoryStream = new MemoryStream();
+        stream.CopyTo(memoryStream);
+        byte[] result = memoryStream.ToArray();
+
+        cache[cacheKey] = result;
+        return result;
+    }
     public T Load<T>(string relativePath)
     {
         relativePath = ContentPath.Normalize(relativePath);

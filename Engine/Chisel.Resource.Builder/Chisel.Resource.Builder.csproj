@@ -21,6 +21,12 @@
 		<EmbeddedResource Include="ShaderLibrary\BuiltIn\*.hlsl" />
 	</ItemGroup>
 	<ItemGroup>
+		<EmbeddedResource Include="TextureLibrary\*.png" />
+	</ItemGroup>
+	<ItemGroup>
+		<EmbeddedResource Include="FontLibrary\*.ttf" />
+	</ItemGroup>
+	<ItemGroup>
 	  <ProjectReference Include="..\Chisel.Framework\Chisel.Framework.csproj" />
 	</ItemGroup>
 </Project>

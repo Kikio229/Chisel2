@@ -64,7 +64,20 @@ public class Texture2D : IDisposable
             }
         }
     }
-
+    public void SetData(int x, int y, int width, int height, ReadOnlySpan<byte> data)
+    {
+        EnsureStagingBuffer((ulong)data.Length);
+        device.UpdateBuffer(stagingBuffer, data, 0);
+        device.CopyBufferToImage(stagingBuffer, Image, new ImageCopyRegion
+        {
+            BufferOffset = 0,
+            DestX = x,
+            DestY = y,
+            Width = (uint)width,
+            Height = (uint)height,
+            MipLevel = 0,
+        });
+    }
     void EnsureStagingBuffer(ulong size)
     {
         // Reused across calls, not recreated - destroying a buffer right after using it as a

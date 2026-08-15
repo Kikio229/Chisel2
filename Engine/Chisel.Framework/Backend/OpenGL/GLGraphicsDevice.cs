@@ -465,6 +465,18 @@ public class GLGraphicsDevice : Disposable, IGraphicsDevice
         gl.TexSubImage2D(TextureTarget.Texture2D, 0, 0, 0, glImage.Width, glImage.Height, pixelFormat, pixelType, null);
         gl.BindBuffer(BufferTargetARB.PixelUnpackBuffer, 0);
     }
+    public unsafe void CopyBufferToImage(IBuffer bufSrc, IImage imgDst, ImageCopyRegion region)
+    {
+        GLBuffer glBuffer = (GLBuffer)bufSrc;
+        GLImage glImage = (GLImage)imgDst;
+
+        (_, PixelFormat pixelFormat, PixelType pixelType) = TranslateImageFormat(glImage.Format);
+
+        gl.BindBuffer(BufferTargetARB.PixelUnpackBuffer, glBuffer.Handle);
+        gl.BindTexture(TextureTarget.Texture2D, glImage.Handle);
+        gl.TexSubImage2D(TextureTarget.Texture2D, (int)region.MipLevel, region.DestX, region.DestY, region.Width, region.Height, pixelFormat, pixelType, null);
+        gl.BindBuffer(BufferTargetARB.PixelUnpackBuffer, 0);
+    }
 
     public void CopyImage(IImage imgSrc, IImage imgDst)
     {

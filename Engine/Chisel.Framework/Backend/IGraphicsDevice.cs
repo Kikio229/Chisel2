@@ -45,6 +45,7 @@ public interface IGraphicsDevice
     void UpdateBuffer(IBuffer buffer, ReadOnlySpan<byte> data, ulong offset);
     void CopyBuffer(IBuffer bufSrc, IBuffer bufDst);
     void CopyBufferToImage(IBuffer bufSrc, IImage imgDst);
+    void CopyBufferToImage(IBuffer buffer, IImage image, ImageCopyRegion region);
     void ResolveImage(IImage src, IImage dst); // For MSAA
     void CopyImage(IImage imgSrc, IImage imgDst);
     void CopyImageToBuffer(IImage imgSrc, IBuffer bufDst);

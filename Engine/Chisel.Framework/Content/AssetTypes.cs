@@ -31,6 +31,7 @@ public static class AssetTypeMap
         [".txt"] = AssetType.Copy,
         [".cmt"] = AssetType.Copy,
         [".ctt"] = AssetType.Copy,
+        [".ttf"] = AssetType.Copy,
         [".choreo"] = AssetType.Copy,
         [".morph"] = AssetType.Copy,
         [".scene"] = AssetType.Copy,

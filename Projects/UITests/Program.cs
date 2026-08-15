@@ -26,6 +26,7 @@ public class TestGame : Game
     ShaderEffect cubeShader;
 
     Texture2D texture;
+    Texture2D testUItex;
     ISampler sampler;
 
     RenderTarget2D screenTexture;
@@ -45,9 +46,7 @@ public class TestGame : Game
     Vector3 forward;
     double elapsed;
 
-    //ImGuiRenderer imgui;
-
-    public TestGame() : base(GraphicsBackend.Direct3D12, true)
+    public TestGame() : base(GraphicsBackend.OpenGL, true)
     {
         Window.SetTickMode(false);
         Window.SetVsyncMode(false);
@@ -63,6 +62,7 @@ public class TestGame : Game
         cubeShader.SetTechnique("Default");
 
         texture = Content.Load<Texture2D>("Textures/test");
+        testUItex = Content.Load<Texture2D>("Textures/UIatlas");
         sampler = GraphicsDevice.CreateSampler(new SamplerDescription
         {
             FilterMode = SamplerFilterMode.Bilinear | SamplerFilterMode.MipmapBilinear,
@@ -175,6 +175,7 @@ public class TestGame : Game
         base.OnWindowResize(width, height);
 
         GraphicsDevice.SetViewport(new(0, 0), new(width, height));
+        GraphicsDevice.SetScissor(new(0, 0), new(width, height));
 
         screenTexture.Resize(Window.Resolution.W, Window.Resolution.H);
 
@@ -184,7 +185,7 @@ public class TestGame : Game
     {
         elapsed += delta;
 
-        bool looking = InputManager.IsInputHeld(Input.MouseLeft);
+        bool looking = InputManager.IsInputHeld(Input.MouseRight);
         if (looking)
         {
             Window.SetCursorMode(CursorMode.Locked | CursorMode.Hidden);
@@ -259,13 +260,10 @@ public class TestGame : Game
         spriteBatch.Draw(screenTexture, Vector2.Zero, new(Window.Resolution.W, Window.Resolution.H), Color.White);
         //spriteBatch.Draw(skiaSurface.Texture, Vector2.Zero, new(Window.Resolution.W, Window.Resolution.H), Color.White);
 
+        spriteBatch.Draw(testUItex, Vector2.Zero, new(testUItex.Width, testUItex.Height), Color.White);
+        spriteBatch.DrawString("Hello world!", 20, Vector2.One * 25f, Color.White);
+
         spriteBatch.End();
-
-        GraphicsDevice.Clear(GraphicsClearFlags.Depth, default, 1f, 0);
-
-        //imgui.BeginLayout(delta);
-        //ImGui.ShowDemoWindow();
-        //imgui.EndLayout();
     }
     protected override void OnShutdown()
     {

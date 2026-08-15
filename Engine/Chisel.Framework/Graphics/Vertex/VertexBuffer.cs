@@ -36,7 +36,11 @@ public class VertexBuffer<T> : IDisposable where T : unmanaged
         device.UpdateBuffer(buffer, bytes, 0);
         Count = data.Length;
     }
-
+    public void SetData(ReadOnlySpan<T> data, int startVertex)
+    {
+        device.UpdateBuffer(buffer, MemoryMarshal.AsBytes(data), (ulong)(startVertex * Marshal.SizeOf<T>()));
+        Count = Math.Max(Count, startVertex + data.Length);
+    }
     public void Bind(uint slot)
     {
         device.BindVertexBuffer(buffer, slot);

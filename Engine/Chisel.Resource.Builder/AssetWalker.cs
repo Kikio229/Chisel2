@@ -14,11 +14,6 @@ internal class AssetWalker
         HashSet<string> expectedOutputs = new HashSet<string>();
         List<(string RelativePath, byte[] Data)> packedEntries = new List<(string, byte[])>();
 
-        foreach (string name in typeof(BuiltInShaderRegistry).Assembly.GetManifestResourceNames())
-        {
-            Console.WriteLine("[Embedded] " + name);
-        }
-
         Console.WriteLine($"[Chisel Packer]: {(options.Pack ? "Packing is ENABLED. Files will be baked into Assets.CPK" : "Packing is DISABLED. Files will be copied over directly.")}");
 
         foreach (string directory in contentDirectories)
@@ -54,26 +49,30 @@ internal class AssetWalker
         }
         ShaderAssetHandler shaderHandler = (ShaderAssetHandler)AssetHandlerRegistry.Resolve(AssetType.Shader);
 
-        foreach (string name in BuiltInShaderRegistry.Names)
+        List<IBuiltInAssetSource> builtInSources = new List<IBuiltInAssetSource>
         {
-            string source = ShaderPreprocessor.ExpandLibraries(BuiltInShaderRegistry.Resolve(name));
-            ShaderAssetHandler.DumpPreprocessedIfRequested(name, source);
-            byte[] data = shaderHandler.CompileSource(source);
+            new BuiltInRegistry<ShaderAssetKind>(),
+            new BuiltInRegistry<TextureAssetKind>(),
+            new BuiltInRegistry<FontAssetKind>(),
+        };
 
-            string outputRelativePath = ContentPath.Normalize("Shaders/" + name + "." + ShaderContentInfo.FileExtension);
-
-            if (!options.Pack || IsUnpacked(outputRelativePath, options.UnpackedPaths))
+        foreach (IBuiltInAssetSource source in builtInSources)
+        {
+            foreach ((string relativePath, byte[] data, string label) in source.Discover())
             {
-                string outputPath = Path.Combine(outputDirectory, outputRelativePath);
-                Directory.CreateDirectory(Path.GetDirectoryName(outputPath));
-                File.WriteAllBytes(outputPath, data);
-                expectedOutputs.Add(outputRelativePath);
-                Console.WriteLine($"[Chisel Packer]: Compiled built-in shader '{name}' to VFS::{outputRelativePath}");
-            }
-            else
-            {
-                packedEntries.Add((outputRelativePath, data));
-                Console.WriteLine($"[Chisel Packer]: Packed built-in shader '{name}' to VFS::{outputRelativePath}");
+                if (!options.Pack || IsUnpacked(relativePath, options.UnpackedPaths))
+                {
+                    string outputPath = Path.Combine(outputDirectory, relativePath);
+                    Directory.CreateDirectory(Path.GetDirectoryName(outputPath));
+                    File.WriteAllBytes(outputPath, data);
+                    expectedOutputs.Add(relativePath);
+                    Console.WriteLine($"[Chisel Packer]: Compiled built-in {label} to VFS::{relativePath}");
+                }
+                else
+                {
+                    packedEntries.Add((relativePath, data));
+                    Console.WriteLine($"[Chisel Packer]: Packed built-in {label} to VFS::{relativePath}");
+                }
             }
         }
 
