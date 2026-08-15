@@ -1,0 +1,19 @@
+{
+  "profiles": {
+    "GeneralPlayground (Auto)": {
+      "commandName": "Project"
+    },
+    "GeneralPlayground (DX12)": {
+      "commandName": "Project",
+      "environmentVariables": {
+        "CHISEL_FORCE_BACKEND": "Direct3D12"
+      }
+    },
+    "GeneralPlayground (OpenGL)": {
+      "commandName": "Project",
+      "environmentVariables": {
+        "CHISEL_FORCE_BACKEND": "OpenGL46"
+      }
+    }
+  }
+}

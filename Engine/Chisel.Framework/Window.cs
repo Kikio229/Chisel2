@@ -78,6 +78,14 @@ public class Window : Disposable
     // TODO: search GPUs and find the best that way
     unsafe GraphicsBackend ResolveAutoBackend()
     {
+        var forced = Environment.GetEnvironmentVariable("CHISEL_FORCE_BACKEND");
+        if (forced is not null)
+        {
+            if (Enum.TryParse<GraphicsBackend>(forced, ignoreCase: true, out var parsed))
+                return parsed;
+
+            throw new ArgumentException($"Unknown CHISEL_FORCE_BACKEND value: '{forced}'");
+        }
 #if WINDOWS
         return GraphicsBackend.Direct3D12;
 #endif
