@@ -694,8 +694,7 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
             HResult removedReason = _device.Get()->GetDeviceRemovedReason();
             FlushD3DInfoQueue();
             FlushDXGIInfoQueue();
-            throw new InvalidOperationException(
-                $"Failed to map D3D upload buffer! Device removed reason: {removedReason}");
+            throw new InvalidOperationException($"Failed to map D3D upload buffer! Device removed reason: {removedReason}");
         }
 
         Span<byte> dst = new Span<byte>((byte*)mapped + offset, data.Length);
@@ -714,8 +713,7 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
             // Arena exhausted for this frame-lane. Rather than fail the draw, fall back to a
             // one-off dedicated buffer. Write a warning though, because 4mb is kind of a lot
             // for simple data.
-            Logger.AppendWarn(
-                $"Constant buffer arena exhausted for frame lane {lane} (needed {data.Length} more " +
+            Logger.AppendWarn( $"Constant buffer arena exhausted for frame lane {lane} (needed {data.Length} more " +
                 $"bytes on top of {_cbufferArenaCursor[lane]} already used this frame, budget is " +
                 $"{_cbufferArenaCapacity}). Falling back to a dedicated buffer for this bind - " +
                 "consider raising _cbufferArenaCapacity if this happens often.");
@@ -755,7 +753,7 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
             // Resources in D3D12 UPLOAD/READBACK heaps are required to stay in GenericRead/CopyDest
             // for their whole lifetime - they can't legally be a GPU copy destination. Use
             // UpdateBuffer (a CPU Map/memcpy) to write into an Upload buffer instead.
-            throw new ArgumentException("Only a GpuOnly buffer can be the destination of CopyBuffer on D3D12.", nameof(bufDst));
+            throw new ArgumentException("Only a GpuOnly buffer can be the destination of CopyBuffer in Direct3D12!", nameof(bufDst));
         }
 
         ID3D12GraphicsCommandList* cmdList = BeginUpload();
@@ -1073,7 +1071,7 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
                 gfxDesc.FillMode, gfxDesc.VertexLayout, gfxDesc.AllowDepthWrite, gfxDesc.SampleCount == 0 ? 1u : gfxDesc.SampleCount);
 
         Interlocked.Increment(ref _liveGraphicsStateCreates);
-        Logger.AppendLog("D3D", $"CreateGraphicsState #{_liveGraphicsStateCreates}", ConsoleColor.Yellow, 2);
+        //Logger.AppendLog("D3D", $"CreateGraphicsState #{_liveGraphicsStateCreates}", ConsoleColor.Yellow, 2);
 
         return (IGraphicsState)gfxState;
     }
@@ -1579,9 +1577,11 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
 
             fixed (Guid* gptr = &ID3D12Debug3.IID_ID3D12Debug3)
             {
-                if (D3D12GetDebugInterface(gptr, (void**)&debug) != HResult.Ok)
+                HResult result = D3D12GetDebugInterface(gptr, (void**)&debug);
+
+                if (result != HResult.Ok)
                 {
-                    throw new InvalidOperationException("Failed to initialize D3D debug layer!");
+                    throw new InvalidOperationException($"Failed to initialize D3D debug layer! HResult 0x{result}");
                 }
             }
 
@@ -1598,9 +1598,11 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
 
         fixed (Guid* gptr = &IDXGIFactory.IID_IDXGIFactory)
         {
-            if (CreateDXGIFactory2(_isDebug, gptr, (void**)&tempFact) != HResult.Ok)
+            HResult result = CreateDXGIFactory2(_isDebug, gptr, (void**)&tempFact);
+
+            if (result != HResult.Ok)
             {
-                throw new InvalidOperationException("Failed to initialize DXGI factory!");
+                throw new InvalidOperationException($"Failed to initialize DXGI factory! HResult 0x{result}");
             }
         }
 
@@ -1608,9 +1610,11 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
 
         fixed (Guid* gptr = &IDXGIFactory7.IID_IDXGIFactory7)
         {
-            if (tempFact->QueryInterface(gptr, (void**)&factory) != HResult.Ok)
+            HResult result = tempFact->QueryInterface(gptr, (void**)&factory);
+
+            if (result != HResult.Ok)
             {
-                throw new InvalidOperationException("Failed query for latest DXGI adapter interface!");
+                throw new InvalidOperationException($"Failed query for latest DXGI adapter interface! HResult 0x{result}");
             }
         }
 
@@ -1678,9 +1682,11 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
 
         fixed (Guid* gptr = &IDXGIAdapter4.IID_IDXGIAdapter4)
         {
-            if (bestAdp->QueryInterface(gptr, (void**)&adapter) != HResult.Ok)
+            HResult result = bestAdp->QueryInterface(gptr, (void**)&adapter);
+
+            if (result != HResult.Ok)
             {
-                throw new InvalidOperationException("Failed query for latest DXGI adapter interface!");
+                throw new InvalidOperationException($"Failed query for latest DXGI adapter interface! HResult 0x{result}");
             }
         }
 
@@ -1694,9 +1700,11 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
 
         fixed (Guid* gptr = &ID3D12Device.IID_ID3D12Device)
         {
-            if (D3D12CreateDevice((IUnknown*)_adapter.Get(), _featLevel, gptr, (void**)&tempDev) != HResult.Ok)
+            HResult result = D3D12CreateDevice((IUnknown*)_adapter.Get(), _featLevel, gptr, (void**)&tempDev);
+
+            if (result != HResult.Ok)
             {
-                throw new InvalidOperationException("Failed to initialize D3D device!");
+                throw new InvalidOperationException($"Failed to initialize D3D device! HResult 0x{result}");
             }
         }
 
@@ -1704,9 +1712,11 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
 
         fixed (Guid* gptr = &ID3D12Device8.IID_ID3D12Device8)
         {
-            if (tempDev->QueryInterface(gptr, (void**)&device) != HResult.Ok)
+            HResult result = tempDev->QueryInterface(gptr, (void**)&device);
+
+            if (result != HResult.Ok)
             {
-                throw new InvalidOperationException("Failed query for latest D3D device interface!");
+                throw new InvalidOperationException($"Failed query for latest D3D device interface! HResult 0x{result}");
             }
         }
 
@@ -1726,17 +1736,21 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
 
         fixed (Guid* gptr = &ID3D12InfoQueue.IID_ID3D12InfoQueue)
         {
-            if (_device.Get()->QueryInterface(gptr, (void**)&infoQueue) != HResult.Ok)
+            HResult result = _device.Get()->QueryInterface(gptr, (void**)&infoQueue);
+
+            if (result != HResult.Ok)
             {
-                throw new InvalidOperationException("Failed to initialize D3D info queue!");
+                throw new InvalidOperationException($"Failed to initialize D3D info queue! HResult 0x{result}");
             }
         }
 
         fixed (Guid* gptr = &IDXGIInfoQueue.IID_IDXGIInfoQueue)
         {
-            if (DXGIGetDebugInterface1(0, gptr, (void**)&dxgiInfoQueue) != HResult.Ok)
+            HResult result = DXGIGetDebugInterface1(0, gptr, (void**)&dxgiInfoQueue);
+
+            if (result != HResult.Ok)
             {
-                throw new InvalidOperationException("Failed to initialize DXGI info queue!");
+                throw new InvalidOperationException($"Failed to initialize DXGI info queue! HResult 0x{result}");
             }
         }
 
@@ -1804,9 +1818,11 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
 
         fixed (Guid* gptr = &ID3D12CommandQueue.IID_ID3D12CommandQueue)
         {
-            if (_device.Get()->CreateCommandQueue(&desc, gptr, (void**)&cmdQueue) != HResult.Ok)
+            HResult result = _device.Get()->CreateCommandQueue(&desc, gptr, (void**)&cmdQueue);
+
+            if (result != HResult.Ok)
             {
-                throw new InvalidOperationException("Failed to initialize D3D command queue!");
+                throw new InvalidOperationException($"Failed to initialize D3D command queue! HResult 0x{result}");
             }
         }
 
@@ -1837,9 +1853,11 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
 
         fixed (Guid* gptr = &IDXGISwapChain1.IID_IDXGISwapChain1)
         {
-            if (_factory.Get()->CreateSwapChainForHwnd((IUnknown*)_cmdQueue.Get(), hwnd, &desc, null, null, &tempChain) != HResult.Ok)
+            HResult result = _factory.Get()->CreateSwapChainForHwnd((IUnknown*)_cmdQueue.Get(), hwnd, &desc, null, null, &tempChain);
+
+            if (result != HResult.Ok)
             {
-                throw new InvalidOperationException("Failed to initialize DXGI swapchain!");
+                throw new InvalidOperationException($"Failed to initialize DXGI swapchain! HResult 0x{result}");
             }
         }
 
@@ -1847,9 +1865,11 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
 
         fixed (Guid* gptr = &IDXGISwapChain4.IID_IDXGISwapChain4)
         {
-            if (tempChain->QueryInterface(gptr, (void**)&swapChain) != HResult.Ok)
+            HResult result = tempChain->QueryInterface(gptr, (void**)&swapChain);
+
+            if (result != HResult.Ok)
             {
-                throw new InvalidOperationException("Failed query for latest DXGI swapchain interface!");
+                throw new InvalidOperationException($"Failed query for latest DXGI swapchain interface! HResult 0x{result}");
             }
         }
 
@@ -1876,9 +1896,11 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
 
         fixed (Guid* gptr = &ID3D12DescriptorHeap.IID_ID3D12DescriptorHeap)
         {
-            if (_device.Get()->CreateDescriptorHeap(&heapDesc, gptr, (void**)&renderHeap) != HResult.Ok)
+            HResult result = _device.Get()->CreateDescriptorHeap(&heapDesc, gptr, (void**)&renderHeap);
+
+            if (result != HResult.Ok)
             {
-                throw new InvalidOperationException("Failed to create D3D render heap!");
+                throw new InvalidOperationException($"Failed to create D3D render heap! HResult 0x{result}");
             }
         }
 
@@ -1891,15 +1913,17 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
         {
             fixed (Guid* gptr = &ID3D12Resource.IID_ID3D12Resource)
             {
-                if (_swapChain.Get()->GetBuffer(i, gptr, (void**)&backBuffers[i]) != HResult.Ok)
+                HResult result = _swapChain.Get()->GetBuffer(i, gptr, (void**)&backBuffers[i]);
+
+                if (result != HResult.Ok)
                 {
-                    throw new InvalidOperationException("Failed to create D3D back buffers!");
+                    throw new InvalidOperationException($"Failed to create D3D back buffers! HResult 0x{result}");
                 }
             }
 
             fixed (char* name = $"BackBuffer{i}")
             {
-                backBuffers[i]->SetName((char*)name);
+                backBuffers[i]->SetName(name);
             }
         }
 
@@ -1933,9 +1957,11 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
 
             fixed (Guid* gptr = &ID3D12CommandAllocator.IID_ID3D12CommandAllocator)
             {
-                if (_device.Get()->CreateCommandAllocator(CommandListType.Direct, gptr, (void**)&cmdAlloc) != HResult.Ok)
+                HResult result = _device.Get()->CreateCommandAllocator(CommandListType.Direct, gptr, (void**)&cmdAlloc);
+
+                if (result != HResult.Ok)
                 {
-                    throw new InvalidOperationException("Failed to initialize D3D command allocator!");
+                    throw new InvalidOperationException($"Failed to initialize D3D command allocator! HResult 0x{result}");
                 }
             }
 
@@ -1947,9 +1973,11 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
 
         fixed (Guid* gptr = &ID3D12CommandAllocator.IID_ID3D12CommandAllocator)
         {
-            if (_device.Get()->CreateCommandAllocator(CommandListType.Direct, gptr, (void**)&uploadAlloc) != HResult.Ok)
+            HResult result = _device.Get()->CreateCommandAllocator(CommandListType.Direct, gptr, (void**)&uploadAlloc);
+
+            if (result != HResult.Ok)
             {
-                throw new InvalidOperationException("Failed to initialize D3D upload command allocator!");
+                throw new InvalidOperationException($"Failed to initialize D3D upload command allocator! HResult 0x{result}");
             }
         }
 
@@ -1964,14 +1992,18 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
 
         fixed (Guid* gptr = &ID3D12GraphicsCommandList.IID_ID3D12GraphicsCommandList)
         {
-            if (_device.Get()->CreateCommandList(0, CommandListType.Direct, _mainCmdAllocs[0].Get(), null, gptr, (void**)&tempList) != HResult.Ok)
+            HResult result = _device.Get()->CreateCommandList(0, CommandListType.Direct, _mainCmdAllocs[0].Get(), null, gptr, (void**)&tempList);
+
+            if (result != HResult.Ok)
             {
-                throw new InvalidOperationException("Failed to initialize D3D command list!");
+                throw new InvalidOperationException($"Failed to initialize D3D command list! HResult 0x{result}");
             }
 
-            if (_device.Get()->CreateCommandList(0, CommandListType.Direct, _uploadCmdAlloc.Get(), null, gptr, (void**)&uploadTempList) != HResult.Ok)
+            result = _device.Get()->CreateCommandList(0, CommandListType.Direct, _uploadCmdAlloc.Get(), null, gptr, (void**)&uploadTempList);
+
+            if (result != HResult.Ok)
             {
-                throw new InvalidOperationException("Failed to initialize D3D upload command list!");
+                throw new InvalidOperationException($"Failed to initialize D3D upload command list! HResult 0x{result}");
             }
         }
 
@@ -1980,14 +2012,18 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
 
         fixed (Guid* gptr = &ID3D12GraphicsCommandList6.IID_ID3D12GraphicsCommandList6)
         {
-            if (tempList->QueryInterface(gptr, (void**)&cmdList) != HResult.Ok)
+            HResult result = tempList->QueryInterface(gptr, (void**)&cmdList) ;
+
+            if (result != HResult.Ok)
             {
-                throw new InvalidOperationException("Failed query for latest D3D command list interface!");
+                throw new InvalidOperationException($"Failed query for latest D3D command list interface! HResult 0x{result}");
             }
 
-            if (uploadTempList->QueryInterface(gptr, (void**)&uploadList) != HResult.Ok)
+            result = uploadTempList->QueryInterface(gptr, (void**)&uploadList);
+
+            if (result != HResult.Ok)
             {
-                throw new InvalidOperationException("Failed query for latest D3D upload command list interface!");
+                throw new InvalidOperationException($"Failed query for latest D3D upload command list interface! HResult 0x{result}");
             }
         }
 
@@ -2006,14 +2042,18 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
 
         fixed (Guid* gptr = &ID3D12Fence.IID_ID3D12Fence)
         {
-            if (_device.Get()->CreateFence(0, FenceFlags.None, gptr, (void**)&tempFen) != HResult.Ok)
+            HResult result = _device.Get()->CreateFence(0, FenceFlags.None, gptr, (void**)&tempFen);
+
+            if (result != HResult.Ok)
             {
-                throw new InvalidOperationException("Failed to initialize D3D fence!");
+                throw new InvalidOperationException($"Failed to initialize D3D fence! HResult 0x{result}");
             }
 
-            if (_device.Get()->CreateFence(0, FenceFlags.None, gptr, (void**)&uploadTempFen) != HResult.Ok)
+            result = _device.Get()->CreateFence(0, FenceFlags.None, gptr, (void**)&uploadTempFen);
+
+            if (result != HResult.Ok)
             {
-                throw new InvalidOperationException("Failed to initialize D3D upload fence!");
+                throw new InvalidOperationException($"Failed to initialize D3D upload fence! HResult 0x{result}");
             }
         }
 
@@ -2022,14 +2062,18 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
 
         fixed (Guid* gptr = &ID3D12Fence1.IID_ID3D12Fence1)
         {
-            if (tempFen->QueryInterface(gptr, (void**)&fence) != HResult.Ok)
+            HResult result = tempFen->QueryInterface(gptr, (void**)&fence);
+
+            if (result != HResult.Ok)
             {
-                throw new InvalidOperationException("Failed query for latest D3D fence interface!");
+                throw new InvalidOperationException($"Failed query for latest D3D fence interface! HResult 0x{result}");
             }
 
-            if (uploadTempFen->QueryInterface(gptr, (void**)&uploadFence) != HResult.Ok)
+            result = uploadTempFen->QueryInterface(gptr, (void**)&uploadFence);
+
+            if (result != HResult.Ok)
             {
-                throw new InvalidOperationException("Failed query for latest D3D upload fence interface!");
+                throw new InvalidOperationException($"Failed query for latest D3D upload fence interface! HResult 0x{result}");
             }
         }
 
@@ -2050,10 +2094,11 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
         };
 
         Allocator allocator;
+        HResult result = CreateAllocator(desc, out allocator);
 
-        if (CreateAllocator(desc, out allocator) != HResult.Ok)
+        if (result != HResult.Ok)
         {
-            throw new InvalidOperationException("Failed to initialize D3D memory allocator!");
+            throw new InvalidOperationException($"Failed to initialize D3D memory allocator! HResult 0x{result}");
         }
 
         _allocator = allocator;

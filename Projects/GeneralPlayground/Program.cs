@@ -38,7 +38,7 @@ public class TestGame : Game
     Vector3 forward;
     double elapsed;
 
-    public TestGame() : base(GraphicsBackend.Direct3D12, false)
+    public TestGame() : base(GraphicsBackend.Direct3D12, true)
     {
         Window.SetTickMode(false);
         Window.SetVsyncMode(false);
