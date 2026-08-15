@@ -1,10 +1,10 @@
-﻿using Chisel.Resource;
-using Hexa.NET.SDL3;
-using Microsoft.Xna.Framework; // TODO: Change the XNA namespace
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Threading;
+using Chisel.Resource;
+using Hexa.NET.SDL3;
+using Microsoft.Xna.Framework; // TODO: Change the XNA namespace
 using Vortice.Win32;
 using Vortice.Win32.Graphics.D3D12MemoryAllocator;
 using Vortice.Win32.Graphics.Direct3D;
@@ -96,9 +96,7 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
     private D3DBuffer[] _cbufferArenas;                          // one per working frame, so 2 for double buffer
     private unsafe void*[] _cbufferArenaMapped;                  // persistently-mapped pointer per lane
     private ulong[] _cbufferArenaCursor;                         // current cursor into the magic buffers
-
-    // And just in case 4mb isnt enough...
-    private List<D3DBuffer>[] _cbufferOverflowBuffers;
+    private List<D3DBuffer>[] _cbufferOverflowBuffers; // And just in case 4mb isnt enough...
 
     // Bump cursors, reset every BeginFrame (safe: EndFrame already blocks until the GPU has fully
     // finished the previous frame, so nothing can still be reading these slots).
@@ -107,11 +105,10 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
     // The block this draw's BindConstantBuffer/BindImage/BindSampler calls should write into
     // set by BindGraphicsState (or BindComputeState), consumed by the three Bind* methods below.
     private uint _currentCbvBase, _currentSrvBase, _currentUavBase, _currentSamplerBase;
+    private static long _liveImageCreates, _liveBufferCreates, _liveGraphicsStateCreates;
+    private readonly CpuDescriptorHandle[] _singleRtvScratch = new CpuDescriptorHandle[1];
     private bool _hasDescriptorBlock;
 
-    private static long _liveImageCreates, _liveBufferCreates, _liveGraphicsStateCreates;
-
-    private readonly CpuDescriptorHandle[] _singleRtvScratch = new CpuDescriptorHandle[1];
 
     // DXGI
     private ComPtr<IDXGIFactory7> _factory;
@@ -237,7 +234,6 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
 
         FlushD3DInfoQueue();
 
-        _mainFenceValue++;
         _cmdQueue.Get()->Signal((ID3D12Fence*)_mainFence.Get(), _mainFenceValue);
         _frameFenceValues[_frameIndex] = _mainFenceValue;
 
@@ -737,7 +733,19 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
         return (_cbufferArenas[lane], aligned);
     }
 
-    public unsafe void CopyBuffer(IBuffer bufSrc, IBuffer bufDst)
+    public void CopyBuffer(IBuffer bufSrc, IBuffer bufDst)
+    {
+        BufferCopyRegion region = new BufferCopyRegion()
+        {
+            Size = bufDst.Size,
+            SrcOffset = 0,
+            DstOffset = 0,
+        };
+
+        CopyBuffer(bufSrc, bufDst, region);
+    }
+
+    public unsafe void CopyBuffer(IBuffer bufSrc, IBuffer bufDst, BufferCopyRegion region)
     {
         D3DBuffer src = (D3DBuffer)bufSrc;
         D3DBuffer dst = (D3DBuffer)bufDst;
@@ -753,80 +761,25 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
         ID3D12GraphicsCommandList* cmdList = BeginUpload();
 
         BarrierTransition(cmdList, dst.Resource, ref dst.State, ResourceStates.CopyDest);
-        cmdList->CopyBufferRegion(dst.Resource, 0, src.Resource, 0, Math.Min(src.Size, dst.Size));
+        cmdList->CopyBufferRegion(dst.Resource, region.DstOffset, src.Resource, region.SrcOffset, region.Size);
         BarrierTransition(cmdList, dst.Resource, ref dst.State, ResourceStates.Common);
 
         EndUploadAndWait();
     }
 
-    public unsafe void CopyBuffer(IBuffer bufSrc, IBuffer bufDst, BufferCopyRegion region)
+    public void CopyBufferToImage(IBuffer bufSrc, IImage imgDst)
     {
-        throw new NotImplementedException("stub!!!");
-    }
-
-    public unsafe void CopyBufferToImage(IBuffer bufSrc, IImage imgDst)
-    {
-        D3DBuffer src = (D3DBuffer)bufSrc;
-        D3DImage dst = (D3DImage)imgDst;
-
-        ResourceDescription desc = dst.Resource->GetDesc();
-
-        PlacedSubresourceFootprint footprint = default;
-        ulong totalBytes;
-        _device.Get()->GetCopyableFootprints(&desc, 0, 1, 0, &footprint, null, null, &totalBytes);
-
-        // Texture2D.SetData hands CopyBufferToImage a *tightly packed* source buffer (width * bpp
-        // per row, no padding) - that's the right, backend-agnostic thing for it to do, since GL's
-        // TexSubImage2D doesn't care about row alignment. D3D12 does: CopyTextureRegion's source
-        // footprint RowPitch must be a multiple of D3D12_TEXTURE_DATA_PITCH_ALIGNMENT (256), which
-        // a tightly-packed row very often isn't. So we repack.
-        uint tightRowPitch = dst.Width * D3DUtilities.GetBytesPerPixel(dst.Format);
-        ulong paddedSize = footprint.Footprint.RowPitch * (ulong)footprint.Footprint.Height;
-
-        D3DBuffer padded = new D3DBuffer(_allocator, paddedSize, BufferType.Upload, BufferUsage.CopySource);
-
-        void* srcMapped;
-        void* dstMapped;
-        src.Resource->Map(0, null, &srcMapped);
-        padded.Resource->Map(0, null, &dstMapped);
-
-        for (uint i = 0; i < dst.Height; i++)
+        ImageBufferCopyRegion region = new ImageBufferCopyRegion()
         {
-            Buffer.MemoryCopy(
-                (byte*)srcMapped + i * tightRowPitch,
-                (byte*)dstMapped + i * footprint.Footprint.RowPitch,
-                footprint.Footprint.RowPitch,
-                tightRowPitch);
-        }
-
-        padded.Resource->Unmap(0, null);
-        src.Resource->Unmap(0, null);
-
-        ID3D12GraphicsCommandList* cmdList = BeginUpload();
-
-        BarrierTransition(cmdList, dst.Resource, ref dst.State, ResourceStates.CopyDest);
-
-        TextureCopyLocation dstLoc = new TextureCopyLocation
-        {
-            pResource = dst.Resource,
-            Type = TextureCopyType.SubresourceIndex,
-            Anonymous = new TextureCopyLocation._Anonymous_e__Union { SubresourceIndex = 0 }
+            Width = imgDst.Width,
+            Height = imgDst.Height,
+            ImageMipLevel = 0,
+            BufferOffset = 0,
+            OffsetX = 0,
+            OffsetY = 0
         };
 
-        TextureCopyLocation srcLoc = new TextureCopyLocation
-        {
-            pResource = padded.Resource,
-            Type = TextureCopyType.PlacedFootprint,
-            Anonymous = new TextureCopyLocation._Anonymous_e__Union { PlacedFootprint = footprint }
-        };
-
-        cmdList->CopyTextureRegion(&dstLoc, 0, 0, 0, &srcLoc, null);
-
-        ResourceStates finalState = (dst.Usage & ImageUsage.Sampled) != 0 ? ResourceStates.PixelShaderResource : ResourceStates.Common;
-        BarrierTransition(cmdList, dst.Resource, ref dst.State, finalState);
-
-        EndUploadAndWait();
-        padded.Dispose();
+        CopyBufferToImage(bufSrc, imgDst, region);
     }
 
     public unsafe void CopyBufferToImage(IBuffer bufSrc, IImage imgDst, ImageBufferCopyRegion region)
@@ -872,7 +825,7 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
         {
             pResource = dst.Resource,
             Type = TextureCopyType.SubresourceIndex,
-            Anonymous = new TextureCopyLocation._Anonymous_e__Union { SubresourceIndex = region.MipLevel }
+            Anonymous = new TextureCopyLocation._Anonymous_e__Union { SubresourceIndex = region.ImageMipLevel }
         };
 
         TextureCopyLocation srcLoc = new TextureCopyLocation
@@ -882,7 +835,7 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
             Anonymous = new TextureCopyLocation._Anonymous_e__Union { PlacedFootprint = footprint }
         };
 
-        cmdList->CopyTextureRegion(&dstLoc, (uint)region.DestX, (uint)region.DestY, 0, &srcLoc, null);
+        cmdList->CopyTextureRegion(&dstLoc, (uint)region.OffsetX, (uint)region.OffsetY, 0, &srcLoc, null);
 
         ResourceStates finalState = (dst.Usage & ImageUsage.Sampled) != 0 ? ResourceStates.PixelShaderResource : ResourceStates.Common;
         BarrierTransition(cmdList, dst.Resource, ref dst.State, finalState);
