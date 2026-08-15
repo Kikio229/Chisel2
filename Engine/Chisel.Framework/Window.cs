@@ -76,14 +76,15 @@ public class Window : Disposable
     }
 
     // TODO: search GPUs and find the best that way
-    static GraphicsBackend ResolveAutoBackend()
+    unsafe GraphicsBackend ResolveAutoBackend()
     {
-        int numDrivers = SDL.GetNumGPUDrivers();
-        Logger.AppendInfo($"{numDrivers} GPUs available.");
-
+#if WINDOWS
+        return GraphicsBackend.Direct3D12;
+#endif
         // Good fallback.
         return GraphicsBackend.OpenGL46;
     }
+
     public unsafe void InitAndRun()
     {
         SDLWindowFlags flags = 0;
@@ -99,8 +100,8 @@ public class Window : Disposable
         if (Backend == GraphicsBackend.OpenGL46)
         {
             SDL.GLSetAttribute(SDLGLAttr.ContextProfileMask, 0x0001); // Core
-            SDL.GLSetAttribute(SDLGLAttr.ContextMajorVersion, 3);
-            SDL.GLSetAttribute(SDLGLAttr.ContextMinorVersion, 3);
+            SDL.GLSetAttribute(SDLGLAttr.ContextMajorVersion, 4);
+            SDL.GLSetAttribute(SDLGLAttr.ContextMinorVersion, 6);
             SDL.GLSetAttribute(SDLGLAttr.DepthSize, 24);
             SDL.GLSetAttribute(SDLGLAttr.StencilSize, 8);
             SDL.GLSetAttribute(SDLGLAttr.Doublebuffer, 1);
