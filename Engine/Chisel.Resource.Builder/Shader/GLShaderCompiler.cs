@@ -38,7 +38,22 @@ unsafe class GLShaderCompiler : IShaderCompiler
         api.CompilerOptionsSetBool(options, CompilerOption.GlslSeparateShaderObjects, 1);
         api.CompilerInstallCompilerOptions(compiler, options);
 
-        api.CompilerBuildCombinedImageSamplers(compiler);
+        api.CompilerBuildCombinedImageSamplers(compiler); 
+        
+        // Apparently we have to assign our own names.
+        CombinedImageSampler* combinedSamplers;
+        nuint combinedCount;
+        api.CompilerGetCombinedImageSamplers(compiler, &combinedSamplers, &combinedCount);
+
+        for (nuint i = 0; i < combinedCount; i++)
+        {
+            CombinedImageSampler combined = combinedSamplers[i];
+            byte* imageName = api.CompilerGetName(compiler, combined.ImageId);
+            byte* samplerNamePtr = api.CompilerGetName(compiler, combined.SamplerId);
+
+            string combinedName = "combined_" + new string((sbyte*)imageName) + "_" + new string((sbyte*)samplerNamePtr);
+            api.CompilerSetName(compiler, combined.CombinedId, combinedName);
+        }
 
         byte* glslSource;
         Result compileResult = api.CompilerCompile(compiler, &glslSource);
@@ -125,12 +140,16 @@ unsafe class GLShaderCompiler : IShaderCompiler
         {
             CombinedImageSampler combined = combinedSamplers[i];
 
-            uint slot = api.CompilerGetDecoration(compiler, combined.CombinedId, Decoration.Binding);
+            uint slot = api.CompilerGetDecoration(compiler, combined.ImageId, Decoration.Binding);
+
+            byte* combinedName = api.CompilerGetName(compiler, combined.CombinedId);
+            string glCompiledName = new string((sbyte*)combinedName);
+
             byte* imageName = api.CompilerGetName(compiler, combined.ImageId);
             byte* samplerName = api.CompilerGetName(compiler, combined.SamplerId);
 
-            images.Add(new ResourceReflection { Name = new string((sbyte*)imageName), Slot = slot });
-            samplers.Add(new ResourceReflection { Name = new string((sbyte*)samplerName), Slot = slot });
+            images.Add(new ResourceReflection { Name = new string((sbyte*)imageName), CompiledName = glCompiledName, Slot = slot });
+            samplers.Add(new ResourceReflection { Name = new string((sbyte*)samplerName), CompiledName = glCompiledName, Slot = slot });
         }
 
         return new ShaderReflection

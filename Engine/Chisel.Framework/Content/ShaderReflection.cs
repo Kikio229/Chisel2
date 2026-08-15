@@ -34,5 +34,6 @@ public class ConstantBufferMemberReflection
 public class ResourceReflection
 {
     public string Name;
+    public string CompiledName = ""; // Not null because DX doesnt touch this
     public uint Slot;
 }

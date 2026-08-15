@@ -78,11 +78,11 @@ public class Window : Disposable
     // TODO: search GPUs and find the best that way
     static GraphicsBackend ResolveAutoBackend()
     {
-#if WINDOWS
-        return GraphicsBackend.Direct3D12;
-#else
-        return GraphicsBackend.OpenGL;
-#endif
+        int numDrivers = SDL.GetNumGPUDrivers();
+        Logger.AppendInfo($"{numDrivers} GPUs available.");
+
+        // Good fallback.
+        return GraphicsBackend.OpenGL46;
     }
     public unsafe void InitAndRun()
     {
@@ -314,6 +314,7 @@ public class Window : Disposable
         if (!string.Equals(Title, title))
         {
             SDL.SetWindowTitle(Handle, title);
+            Title = title;
         }
     }
 

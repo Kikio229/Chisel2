@@ -726,7 +726,13 @@ public class GLGraphicsDevice : Disposable, IGraphicsDevice
 
         foreach (ResourceReflection sampler in reflection.Samplers)
         {
-            int location = gl.GetUniformLocation(programHandle, sampler.Name);
+            string glName = sampler.CompiledName ?? sampler.Name;
+            int location = gl.GetUniformLocation(programHandle, glName);
+
+            if(Game.Instance?.Window.IsDebug ?? false)
+            {
+                Logger.AppendInfo($"Bound to named GL sampler: {sampler.CompiledName}");
+            }
 
             if (location >= 0)
             {

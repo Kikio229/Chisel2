@@ -1,4 +1,6 @@
-﻿using System.IO;
+﻿using System;
+using System.IO;
+using static System.Net.Mime.MediaTypeNames;
 
 namespace Chisel.Resource;
 
@@ -26,6 +28,7 @@ public static class ShaderReflectionSerializer
         foreach (ResourceReflection image in reflection.Images)
         {
             writer.Write(image.Name);
+            writer.Write(image.CompiledName);
             writer.Write(image.Slot);
         }
 
@@ -33,6 +36,7 @@ public static class ShaderReflectionSerializer
         foreach (ResourceReflection sampler in reflection.Samplers)
         {
             writer.Write(sampler.Name);
+            writer.Write(sampler.CompiledName);
             writer.Write(sampler.Slot);
         }
 
@@ -83,14 +87,14 @@ public static class ShaderReflectionSerializer
         ResourceReflection[] images = new ResourceReflection[imageCount];
         for (int i = 0; i < imageCount; i++)
         {
-            images[i] = new ResourceReflection { Name = reader.ReadString(), Slot = reader.ReadUInt32() };
+            images[i] = new ResourceReflection { Name = reader.ReadString(), CompiledName = reader.ReadString(), Slot = reader.ReadUInt32() };
         }
 
         int samplerCount = reader.ReadInt32();
         ResourceReflection[] samplers = new ResourceReflection[samplerCount];
         for (int i = 0; i < samplerCount; i++)
         {
-            samplers[i] = new ResourceReflection { Name = reader.ReadString(), Slot = reader.ReadUInt32() };
+            samplers[i] = new ResourceReflection { Name = reader.ReadString(), CompiledName = reader.ReadString(), Slot = reader.ReadUInt32() };
         }
 
         int inputCount = reader.ReadInt32();

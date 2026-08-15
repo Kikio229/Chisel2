@@ -172,6 +172,10 @@ public class TestGame : Game
         modelShader.Parameters["RealtimeLightColors"]?.SetValue(new ReadOnlySpan<Vector4>(colors));
         modelShader.Parameters["RealtimeLightSpotData"]?.SetValue(new ReadOnlySpan<Vector4>(spotData));
 
+        modelShader.Parameters["DiffuseSampler"].SetValue(sampler);
+        modelShader.Parameters["SpecularSampler"]?.SetValue(sampler);
+        modelShader.Parameters["NormalSampler"]?.SetValue(sampler);
+
         foreach (var obj in sceneObjects)
         {
             Matrix world = obj.GetWorld(elapsed);
@@ -184,11 +188,8 @@ public class TestGame : Game
             modelShader.Parameters["Transparent"]?.SetValue(obj.Transparent ? 1 : 0);
 
             modelShader.Parameters["DiffuseTexture"].SetValue(obj.Texture);
-            modelShader.Parameters["DiffuseSampler"].SetValue(sampler);
             modelShader.Parameters["SpecularTexture"]?.SetValue(defaultSpecular);
-            modelShader.Parameters["SpecularSampler"]?.SetValue(sampler);
             modelShader.Parameters["NormalTexture"]?.SetValue(defaultNormal);
-            modelShader.Parameters["NormalSampler"]?.SetValue(sampler);
 
             QuickDraw.BindVertexBuffer(obj.Mesh.Vertices);
             QuickDraw.BindIndexBuffer(obj.Mesh.Indices);
