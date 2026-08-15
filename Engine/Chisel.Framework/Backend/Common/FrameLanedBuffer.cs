@@ -3,8 +3,6 @@ using System.Runtime.InteropServices;
 
 namespace Chisel.Framework;
 
-// Backs any per-frame-lane-duplicated Upload buffer (VertexBuffer<T>, IndexBuffer, and
-// anything else that needs one GPU resource per frame-in-flight).
 internal sealed class FrameLanedBuffer : IDisposable
 {
     IGraphicsDevice _device;

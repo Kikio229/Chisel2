@@ -56,7 +56,7 @@ float3 CalculateCombinedLighting(float3 worldPosition, float3 N, float3 V,
     float3 diffuse  = float3(0, 0, 0);
     float3 specular = float3(0, 0, 0);
 
-    AccumulateLight(SunDirection, SunColor.rgb * SunIntensity, N, V, specularIntensity, shininess, diffuse, specular);
+    AccumulateLight(-SunDirection, SunColor.rgb * SunIntensity, N, V, specularIntensity, shininess, diffuse, specular);
 
     [loop]
     for (int i = 0; i < StaticLightCount; i++)

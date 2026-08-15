@@ -19,6 +19,8 @@ public class TestGame : Game
 
     Texture2D face;
     Texture2D grid;
+    Texture2D defaultSpecular;
+    Texture2D defaultNormal;
     ISampler sampler;
 
     RenderTarget2D screenTexture;
@@ -38,7 +40,7 @@ public class TestGame : Game
     Vector3 forward;
     double elapsed;
 
-    public TestGame() : base(GraphicsBackend.OpenGL46, true)
+    public TestGame() : base(GraphicsBackend.Auto, true)
     {
         Window.SetTickMode(false);
         Window.SetVsyncMode(false);
@@ -48,11 +50,15 @@ public class TestGame : Game
     {
         base.OnStartup();
 
-        modelShader = Content.Load<ShaderEffect>("Shaders/SimpleModel");
+        modelShader = Content.Load<ShaderEffect>("Shaders/Model");
         modelShader.SetTechnique("Default");
 
         face = Content.Load<Texture2D>("Textures/test");
         grid = Content.Load<Texture2D>("Textures/devGrid");
+
+        defaultSpecular = CreateFlatTexture(GraphicsDevice, 128, 128, 128, 0);
+        defaultNormal = CreateFlatTexture(GraphicsDevice, 128, 128, 255, 255);
+
         sampler = GraphicsDevice.CreateSampler(new SamplerDescription
         {
             FilterMode = SamplerFilterMode.Bilinear | SamplerFilterMode.MipmapBilinear,
@@ -74,8 +80,13 @@ public class TestGame : Game
             ImageFormat.R32G32B32A32Float, ImageFormat.D24UNormS8UInt, 4);
 
         UpdateProjection();
+    }
 
-        Window.SetTickMode(false);
+    static Texture2D CreateFlatTexture(IGraphicsDevice device, byte r, byte g, byte b, byte a)
+    {
+        var tex = new Texture2D(device, 1, 1);
+        tex.SetData(new byte[] { r, g, b, a });
+        return tex;
     }
 
     void UpdateProjection()
@@ -130,6 +141,7 @@ public class TestGame : Game
 
         view = Matrix.CreateLookAt(cameraPosition, cameraPosition + forward, Vector3.Up);
     }
+
     protected override void OnDrawFrame(double delta)
     {
         screenTexture.Begin();
@@ -145,7 +157,11 @@ public class TestGame : Game
         modelShader.Parameters["Time"]?.SetValue((float)elapsed);
         modelShader.Parameters["ScreenSize"]?.SetValue(new Vector2(Window.Resolution.W, Window.Resolution.H));
 
-        // One warm point light orbiting the whole scene.
+        Vector3 sunDir = Vector3.Normalize(new Vector3(-0.4f, -1f, -0.3f));
+        modelShader.Parameters["SunDirection"]?.SetValue(sunDir);
+        modelShader.Parameters["SunIntensity"]?.SetValue(0.6f);
+        modelShader.Parameters["SunColor"]?.SetValue(new Vector4(1f, 0.95f, 0.85f, 1f));
+
         Vector3 lightPos = new Vector3(MathF.Cos((float)elapsed) * 4f, 2.5f, MathF.Sin((float)elapsed) * 4f);
         var positions = new[] { new Vector4(lightPos, 8f) };
         var colors = new[] { new Vector4(1f, 0.85f, 0.6f, 2f) };
@@ -158,9 +174,21 @@ public class TestGame : Game
 
         foreach (var obj in sceneObjects)
         {
+            Matrix world = obj.GetWorld(elapsed);
+            Matrix worldInverseTranspose = Matrix.Transpose(Matrix.Invert(world));
+
+            modelShader.Parameters["World"]?.SetValue(world);
+            modelShader.Parameters["WorldInverseTranspose"]?.SetValue(worldInverseTranspose);
+
+            modelShader.Parameters["Shininess"]?.SetValue(obj.Shininess);
+            modelShader.Parameters["Transparent"]?.SetValue(obj.Transparent ? 1 : 0);
+
             modelShader.Parameters["DiffuseTexture"].SetValue(obj.Texture);
             modelShader.Parameters["DiffuseSampler"].SetValue(sampler);
-            modelShader.Parameters["World"]?.SetValue(obj.GetWorld(elapsed));
+            modelShader.Parameters["SpecularTexture"]?.SetValue(defaultSpecular);
+            modelShader.Parameters["SpecularSampler"]?.SetValue(sampler);
+            modelShader.Parameters["NormalTexture"]?.SetValue(defaultNormal);
+            modelShader.Parameters["NormalSampler"]?.SetValue(sampler);
 
             QuickDraw.BindVertexBuffer(obj.Mesh.Vertices);
             QuickDraw.BindIndexBuffer(obj.Mesh.Indices);
@@ -184,13 +212,15 @@ public class TestGame : Game
         groundMesh.Dispose();
         screenTexture.Dispose();
         spriteBatch.Dispose();
+        defaultSpecular.Dispose();
+        defaultNormal.Dispose();
     }
 
     void BuildScene()
     {
-        cubeMesh = new MeshBuffers(GraphicsDevice, PrimitiveBuilder.CreateCube(1f, Vector4.One*0.05f));
-        sphereMesh = new MeshBuffers(GraphicsDevice, PrimitiveBuilder.CreateSphere(0.5f, 24, 16, Vector4.One * 0.05f));
-        groundMesh = new MeshBuffers(GraphicsDevice, PrimitiveBuilder.CreatePlane(20f, 20f, Vector4.One * 0.05f, new Vector2(8, 8)));
+        cubeMesh = new MeshBuffers(GraphicsDevice, PrimitiveBuilder.CreateCube(1f));
+        sphereMesh = new MeshBuffers(GraphicsDevice, PrimitiveBuilder.CreateSphere(0.5f, 24, 16));
+        groundMesh = new MeshBuffers(GraphicsDevice, PrimitiveBuilder.CreatePlane(20f, 20f, new Vector2(8, 8)));
 
         // ground
         sceneObjects.Add(new SceneObject { Mesh = groundMesh, Texture = grid, Position = new Vector3(0, -1f, 0) });

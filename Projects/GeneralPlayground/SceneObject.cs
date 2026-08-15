@@ -20,6 +20,9 @@ public class SceneObject
     public float BobAmplitude;
     public float BobSpeed;
 
+    public float Shininess = 8f;
+    public bool Transparent = false;
+
     public Matrix GetWorld(double elapsed)
     {
         Vector3 pos = Position;

@@ -25,6 +25,12 @@ public class IndexBuffer : IDisposable
         Count = data.Length;
     }
 
+    public void SetData(ReadOnlySpan<uint> data, int startIndex)
+    {
+        buffer.Write(MemoryMarshal.AsBytes(data), sizeof(uint)*startIndex);
+        Count = data.Length;
+    }
+
     public void Bind()
     {
         device.BindIndexBuffer(buffer.FlushBeforeBind());
