@@ -14,7 +14,7 @@ public class ConstantBuffer : IDisposable
     bool dirty;
     bool disposedValue;
 
-    readonly bool useRing;
+    readonly bool useArena;
     IBuffer nonRingBuffer; // GL path only: single reused buffer, driver-orphaning handles the rest
 
     // D3D path only: one independent slot list + write-cursor per frame-in-flight lane. A lane
@@ -35,9 +35,9 @@ public class ConstantBuffer : IDisposable
         GraphicsDevice = device;
         data = new byte[sizeInBytes];
 
-        useRing = device.Backend == GraphicsBackend.Direct3D12;
+        useArena = device.Backend == GraphicsBackend.Direct3D12;
 
-        if (useRing)
+        if (useArena)
         {
             laneRings = new IBuffer[MaxLanes][];
             lanePositions = new int[MaxLanes];
@@ -80,49 +80,18 @@ public class ConstantBuffer : IDisposable
 
     internal void FlushAndBind()
     {
-        IBuffer target;
-
-        if (useRing)
+        if (useArena)
         {
-            uint frameIndex = GraphicsDevice.CurrentFrameIndex;
-
-            if (frameIndex != lastSeenFrameIndex)
-            {
-                lastSeenFrameIndex = frameIndex;
-                lanePositions[frameIndex] = 0;
-            }
-
-            IBuffer[] lane = laneRings[frameIndex];
-            int slotIndex = lanePositions[frameIndex]++;
-
-            if (slotIndex >= lane.Length)
-            {
-                // Only grows the first time this lane needs this many binds in a single frame -
-                // once steady state is reached (same call count every frame), this stops firing
-                // entirely and every later frame just reuses the same physical buffers.
-                Array.Resize(ref lane, slotIndex + 1);
-                lane[slotIndex] = AllocateSlot();
-                laneRings[frameIndex] = lane;
-            }
-            else
-            {
-                GraphicsDevice.UpdateBuffer(lane[slotIndex], data, 0);
-            }
-
-            target = lane[slotIndex];
+            var (arena, offset) = GraphicsDevice.SuballocateConstantBuffer(data);
+            GraphicsDevice.BindConstantBuffer(arena, offset, (uint)data.Length, Slot);
         }
         else
         {
-            target = nonRingBuffer;
-
-            if (dirty)
-            {
-                GraphicsDevice.UpdateBuffer(target, data, 0);
-            }
+            if (dirty) GraphicsDevice.UpdateBuffer(nonRingBuffer, data, 0);
+            GraphicsDevice.BindConstantBuffer(nonRingBuffer, Slot);
         }
 
         dirty = false;
-        GraphicsDevice.BindConstantBuffer(target, Slot);
     }
 
     public void Dispose()
@@ -132,7 +101,7 @@ public class ConstantBuffer : IDisposable
             return;
         }
 
-        if (useRing)
+        if (useArena)
         {
             foreach (IBuffer[] lane in laneRings)
             {

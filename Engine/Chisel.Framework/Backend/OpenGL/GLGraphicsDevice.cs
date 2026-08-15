@@ -915,4 +915,13 @@ public class GLGraphicsDevice : Disposable, IGraphicsDevice
                 throw new ArgumentOutOfRangeException(nameof(format));
         }
     }
+
+    // GL is not magic yet
+
+    public void BindConstantBuffer(IBuffer buffer, ulong offset, uint size, uint slot) => BindConstantBuffer(buffer,slot);
+
+    public (IBuffer arena, ulong offset) SuballocateConstantBuffer(ReadOnlySpan<byte> data)
+    {
+        throw new NotImplementedException();
+    }
 }

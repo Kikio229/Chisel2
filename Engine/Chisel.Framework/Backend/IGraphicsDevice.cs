@@ -39,12 +39,14 @@ public interface IGraphicsDevice
     void BindVertexBuffer(IBuffer buffer, uint slot);
     void BindIndexBuffer(IBuffer buffer);
     void BindConstantBuffer(IBuffer buffer, uint slot);
+    void BindConstantBuffer(IBuffer buffer, ulong offset, uint size, uint slot);
     void BindStorageBuffer(IBuffer buffer);
     void BindImage(IImage image, uint slot);
     void BindSampler(ISampler sampler, uint slot);
     void BindGraphicsState(IGraphicsState gfxState);
     void BindComputeState(IComputeState cmpState);
     void UpdateBuffer(IBuffer buffer, ReadOnlySpan<byte> data, ulong offset);
+    (IBuffer arena, ulong offset) SuballocateConstantBuffer(ReadOnlySpan<byte> data);
     void CopyBuffer(IBuffer bufSrc, IBuffer bufDst);
     void CopyBufferToImage(IBuffer bufSrc, IImage imgDst);
     void CopyBufferToImage(IBuffer buffer, IImage image, ImageCopyRegion region);
