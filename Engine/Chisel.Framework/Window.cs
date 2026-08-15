@@ -256,6 +256,12 @@ public class Window : Disposable
             }
         }
 
+        // This is kinda hacky and we should prob just have a GD.OnShutdown.
+        if (Game.Instance!.GraphicsDevice is D3DGraphicsDevice d3d)
+        {
+            d3d.WaitForGpuIdle();
+        }
+
         Shutdown?.Invoke();
     }
 

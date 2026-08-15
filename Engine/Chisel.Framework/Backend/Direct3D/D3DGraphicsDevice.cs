@@ -107,7 +107,7 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
     private ComPtr<ID3D12InfoQueue> _infoQueue;
     private ComPtr<ID3D12CommandQueue> _cmdQueue;
     private ComPtr<ID3D12GraphicsCommandList6> _cmdList;
-    private ComPtr<ID3D12CommandAllocator> _cmdAlloc;
+    private ComPtr<ID3D12CommandAllocator>[] _cmdAllocs;
 
     // D3D12 misc
     private ComPtr<ID3D12DescriptorHeap> _renderHeap;
@@ -118,11 +118,14 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
     // New field alongside _infoQueue
     private ComPtr<IDXGIInfoQueue> _dxgiInfoQueue;
 
+    // Apparently our dumb asses destroyed all the benefit of double buffering... par for the course lol
+    private ulong[] _frameFenceValues;
 
     public D3DGraphicsDevice(bool debug)
     {
         _frameCount = 2;
         _fenceValue = 0;
+        _frameFenceValues = new ulong[_frameCount];
         _fenceEvent = new AutoResetEvent(false);
         _featLevel = FeatureLevel.Level_11_0;
         _isDebug = debug;
@@ -348,7 +351,7 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
     // Blocks until the GPU has caught up with everything submitted so far.
     // This drains the *main* queue, needed before touching
     // swap chain buffers since ResizeBuffers requires zero outstanding references to them.
-    private unsafe void WaitForGpuIdle()
+    public unsafe void WaitForGpuIdle()
     {
         _cmdQueue.Get()->Signal((ID3D12Fence*)_fence.Get(), _fenceValue);
 
@@ -363,6 +366,16 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
     // Clear the CMD buffer, reset our counters and memory trackers
     public unsafe void BeginFrame()
     {
+        _currentFrameIndex = _swapChain.Get()->GetCurrentBackBufferIndex();
+
+        // Only wait if this frame actually is in use rn
+        ulong waitValue = _frameFenceValues[_currentFrameIndex];
+        if (_fence.Get()->GetCompletedValue() < waitValue)
+        {
+            _fence.Get()->SetEventOnCompletion(waitValue, (Handle)_fenceEvent.SafeWaitHandle.DangerousGetHandle());
+            _fenceEvent.WaitOne();
+        }
+
         // Set all of the trackers to the beginning
         _cbvBumpCursor = 0;
         _srvBumpCursor = 0;
@@ -370,10 +383,8 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
         _samplerBumpCursor = 0;
         _hasAllocatedDescriptorBlock = false;
 
-        _currentFrameIndex = _swapChain.Get()->GetCurrentBackBufferIndex();
-
-        _cmdAlloc.Get()->Reset();
-        _cmdList.Get()->Reset(_cmdAlloc.Get(), null);
+        _cmdAllocs[_currentFrameIndex].Get()->Reset();
+        _cmdList.Get()->Reset(_cmdAllocs[_currentFrameIndex].Get(), null);
 
         ID3D12DescriptorHeap** heaps = stackalloc ID3D12DescriptorHeap*[2] { _resourceHeap.Heap, _samplerHeap.Heap };
         _cmdList.Get()->SetDescriptorHeaps(2, heaps);
@@ -425,16 +436,9 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
             }
         }
 
-        // Waiting for the GPU
-        _cmdQueue.Get()->Signal((ID3D12Fence*)_fence.Get(), _fenceValue);
-
-        if (_fence.Get()->GetCompletedValue() < _fenceValue)
-        {
-            _fence.Get()->SetEventOnCompletion(_fenceValue, (Handle)_fenceEvent.SafeWaitHandle.DangerousGetHandle());
-            _fenceEvent.WaitOne();
-        }
-
         _fenceValue++;
+        _cmdQueue.Get()->Signal((ID3D12Fence*)_fence.Get(), _fenceValue);
+        _frameFenceValues[_currentFrameIndex] = _fenceValue;
 
         if (_pendingResize)
         {
@@ -1401,6 +1405,9 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
     {
         if (disposing)
         {
+            // just in case
+            WaitForGpuIdle();
+
             _factory.Dispose();
             _adapter.Dispose();
             _swapChain.Dispose();
@@ -1408,7 +1415,7 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
             _infoQueue.Dispose();
             _cmdQueue.Dispose();
             _cmdList.Dispose();
-            _cmdAlloc.Dispose();
+            foreach (var a in _cmdAllocs) a.Dispose();
             _renderHeap.Dispose();
             _resourceHeap.Dispose();
             _samplerHeap.Dispose();
@@ -1788,27 +1795,31 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
     }
     private unsafe void InitCommandAllocator()
     {
-        ID3D12CommandAllocator* cmdAlloc;
+        _cmdAllocs = new ComPtr<ID3D12CommandAllocator>[_frameCount];
 
-        fixed (Guid* gptr = &ID3D12CommandAllocator.IID_ID3D12CommandAllocator)
+        for (uint i = 0; i < _frameCount; i++)
         {
-            if (_device.Get()->CreateCommandAllocator(CommandListType.Direct, gptr, (void**)&cmdAlloc) != HResult.Ok)
+            ID3D12CommandAllocator* cmdAlloc;
+
+            fixed (Guid* gptr = &ID3D12CommandAllocator.IID_ID3D12CommandAllocator)
             {
-                throw new InvalidOperationException("Failed to initialize D3D command allocator!");
+                if (_device.Get()->CreateCommandAllocator(CommandListType.Direct, gptr, (void**)&cmdAlloc) != HResult.Ok)
+                {
+                    throw new InvalidOperationException("Failed to initialize D3D command allocator!");
+                }
             }
+
+            cmdAlloc->Reset();
+            _cmdAllocs[i].Attach(cmdAlloc);
         }
-
-        cmdAlloc->Reset();
-        _cmdAlloc.Attach(cmdAlloc);
     }
-
     private unsafe void InitCommandList()
     {
         ID3D12GraphicsCommandList* tempList;
 
         fixed (Guid* gptr = &ID3D12GraphicsCommandList.IID_ID3D12GraphicsCommandList)
         {
-            if (_device.Get()->CreateCommandList(0, CommandListType.Direct, _cmdAlloc.Get(), null, gptr, (void**)&tempList) != HResult.Ok)
+            if (_device.Get()->CreateCommandList(0, CommandListType.Direct, _cmdAllocs[0].Get(), null, gptr, (void**)&tempList) != HResult.Ok)
             {
                 throw new InvalidOperationException("Failed to initialize D3D command list!");
             }
