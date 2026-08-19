@@ -133,8 +133,7 @@ public class Window : Disposable
         _isActive = true;
 
         ulong frequency = SDL.GetPerformanceFrequency();
-        ulong current = 0;
-        ulong previous = 0;
+        ulong previous = SDL.GetPerformanceCounter();
 
         double time = 0;
         double delta = 0;
@@ -148,9 +147,9 @@ public class Window : Disposable
 
         while (_isActive)
         {
-            current = SDL.GetPerformanceCounter();
-            time = (double)(current / frequency);
-            delta = (double)(current - previous) / frequency;
+            ulong current = SDL.GetPerformanceCounter();
+            time = ((double)current / frequency); 
+            delta = (double)(current - previous) / (double)frequency;
             previous = current;
 
             if (nextFrame == 0)

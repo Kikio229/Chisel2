@@ -107,8 +107,6 @@ public class TestGame : Game
     }
     protected override void OnFrameUpdate(double delta)
     {
-        elapsed += delta;
-
         bool looking = InputManager.IsInputHeld(Input.MouseLeft);
         if (looking)
         {
@@ -143,6 +141,8 @@ public class TestGame : Game
 
     protected override void OnDrawFrame(double delta)
     {
+        elapsed += delta;
+
         screenTexture.Begin();
 
         GraphicsDevice.Clear(new Color(15, 15, 15));
