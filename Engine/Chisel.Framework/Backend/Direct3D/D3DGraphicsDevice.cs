@@ -108,13 +108,6 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
     private const uint _cbufferReuseSlots = 16384;
     private const int _cbufferReuseMaxProbe = 32;
 
-    private ulong[] _cbufferReuseHash;       // size = _maxFramesInFlight * _cbufferReuseSlots
-    private ulong[] _cbufferReuseOffset;
-    private int[] _cbufferReuseLength;
-    private uint[] _cbufferReuseGeneration;  // slot's last-written generation; compared against current to mean "empty"
-    private uint[] _cbufferReuseCurrentGen;  // per lane
-    private bool _cbufferReuseTableFullWarned;
-
     // Bump cursors, reset every BeginFrame (safe: EndFrame already blocks until the GPU has fully
     // finished the previous frame, so nothing can still be reading these slots).
     private uint _cbvBumpCursor, _srvBumpCursor, _uavBumpCursor, _samplerBumpCursor;
@@ -273,14 +266,6 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
 
         // reset the buffer cursor
         _cbufferArenaCursor[_frameIndex] = 0;
-
-        _cbufferReuseCurrentGen[_frameIndex]++;
-
-        if (_cbufferReuseCurrentGen[_frameIndex] == 0)
-        {
-            Array.Clear(_cbufferReuseGeneration, (int)(_frameIndex * _cbufferReuseSlots), (int)_cbufferReuseSlots);
-            _cbufferReuseCurrentGen[_frameIndex] = 1;
-        }
 
         foreach (var o in _cbufferOverflowBuffers[_frameIndex])
         {
@@ -2343,17 +2328,10 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
         _cbufferOverflowBuffers = new List<D3DBuffer>[_maxFramesInFlight];
         _cbufferArenaPendingGrow = new bool[_maxFramesInFlight];
 
-        _cbufferReuseHash = new ulong[_maxFramesInFlight * _cbufferReuseSlots];
-        _cbufferReuseOffset = new ulong[_maxFramesInFlight * _cbufferReuseSlots];
-        _cbufferReuseLength = new int[_maxFramesInFlight * _cbufferReuseSlots];
-        _cbufferReuseGeneration = new uint[_maxFramesInFlight * _cbufferReuseSlots];
-        _cbufferReuseCurrentGen = new uint[_maxFramesInFlight];
-
         for (int i = 0; i < _maxFramesInFlight; i++)
         {
             _cbufferArenas[i] = new D3DBuffer(_allocator, _cbufferArenaCapacity, BufferType.Upload, BufferUsage.Constant);
             _cbufferOverflowBuffers[i] = new List<D3DBuffer>();
-            _cbufferReuseCurrentGen[i] = 1; // slot default (0) must never equal the first real generation
 
             void* mapped;
             _cbufferArenas[i].Resource->Map(0, null, &mapped);
