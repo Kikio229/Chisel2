@@ -215,74 +215,550 @@ public class TestGame : Game
         defaultSpecular.Dispose();
         defaultNormal.Dispose();
     }
-
     void BuildScene()
     {
-        cubeMesh = new MeshBuffers(GraphicsDevice, PrimitiveBuilder.CreateCube(1f));
-        sphereMesh = new MeshBuffers(GraphicsDevice, PrimitiveBuilder.CreateSphere(0.5f, 24, 16));
-        groundMesh = new MeshBuffers(GraphicsDevice, PrimitiveBuilder.CreatePlane(20f, 20f, new Vector2(8, 8)));
+        // ---------------------------------------------------------------------
+        // Meshes
+        // ---------------------------------------------------------------------
 
-        // ground
-        sceneObjects.Add(new SceneObject { Mesh = groundMesh, Texture = grid, Position = new Vector3(0, -1f, 0) });
+        cubeMesh = new MeshBuffers(
+            GraphicsDevice,
+            PrimitiveBuilder.CreateCube(1f));
 
-        // centerpiece cube
-        sceneObjects.Add(new SceneObject { Mesh = cubeMesh, Texture = face, Position = Vector3.Zero, SpinSpeed = 0.5f });
+        sphereMesh = new MeshBuffers(
+            GraphicsDevice,
+            PrimitiveBuilder.CreateSphere(0.5f, 16, 12));
 
-        // three small orbiting cubes
+        groundMesh = new MeshBuffers(
+            GraphicsDevice,
+            PrimitiveBuilder.CreatePlane(40f, 40f, new Vector2(16, 16)));
+
+
+        // ---------------------------------------------------------------------
+        // Ground
+        // ---------------------------------------------------------------------
+
+        sceneObjects.Add(new SceneObject
+        {
+            Mesh = groundMesh,
+            Texture = grid,
+            Position = new Vector3(0, -1.5f, 0),
+            Scale = Vector3.One
+        });
+
+
+        // ---------------------------------------------------------------------
+        // Central rotating structure
+        // ---------------------------------------------------------------------
+
         sceneObjects.Add(new SceneObject
         {
             Mesh = cubeMesh,
-            Texture = grid,
-            Scale = new Vector3(0.4f),
-            Position = new Vector3(0, 0.5f, 0),
-            Orbits = true,
-            OrbitRadius = 2.5f,
-            OrbitSpeed = 0.9f,
-            OrbitPhase = 0f,
-            SpinSpeed = 2f
-        });
-        sceneObjects.Add(new SceneObject
-        {
-            Mesh = cubeMesh,
-            Texture = grid,
-            Scale = new Vector3(0.4f),
-            Position = new Vector3(0, 0.2f, 0),
-            Orbits = true,
-            OrbitRadius = 2.5f,
-            OrbitSpeed = 0.9f,
-            OrbitPhase = MathHelper.TwoPi / 3f,
-            SpinSpeed = -2f
-        });
-        sceneObjects.Add(new SceneObject
-        {
-            Mesh = cubeMesh,
-            Texture = grid,
-            Scale = new Vector3(0.4f),
-            Position = new Vector3(0, 0.8f, 0),
-            Orbits = true,
-            OrbitRadius = 2.5f,
-            OrbitSpeed = 0.9f,
-            OrbitPhase = MathHelper.TwoPi * 2f / 3f,
-            SpinSpeed = 2f
+            Texture = face,
+            Position = Vector3.Zero,
+            Scale = new Vector3(1.5f),
+            SpinSpeed = 0.35f
         });
 
-        // two bobbing spheres
-        sceneObjects.Add(new SceneObject
+        // Large central spheres
+        for (int i = 0; i < 8; i++)
         {
-            Mesh = sphereMesh,
-            Texture = grid,
-            Position = new Vector3(-3.5f, 0, -1f),
-            BobAmplitude = 0.3f,
-            BobSpeed = 1.3f
-        });
-        sceneObjects.Add(new SceneObject
+            float angle = i / 8f * MathHelper.TwoPi;
+
+            float radius = 3.2f;
+
+            sceneObjects.Add(new SceneObject
+            {
+                Mesh = sphereMesh,
+                Texture = grid,
+
+                Position = new Vector3(
+                    MathF.Cos(angle) * radius,
+                    0.5f + MathF.Sin(angle * 2f) * 0.5f,
+                    MathF.Sin(angle) * radius),
+
+                Scale = new Vector3(0.35f),
+
+                Orbits = true,
+                OrbitRadius = radius,
+                OrbitSpeed = 0.35f + i * 0.03f,
+                OrbitPhase = angle,
+
+                BobAmplitude = 0.3f + i * 0.03f,
+                BobSpeed = 1f + i * 0.1f,
+
+                SpinSpeed = 1f + i * 0.15f
+            });
+        }
+
+
+        // ---------------------------------------------------------------------
+        // Orbital ring #1
+        // ---------------------------------------------------------------------
+
+        const int Ring1Count = 150;
+
+        for (int i = 0; i < Ring1Count; i++)
         {
-            Mesh = sphereMesh,
-            Texture = grid,
-            Position = new Vector3(3.5f, 0, 1f),
-            BobAmplitude = 0.3f,
-            BobSpeed = 1.7f
-        });
+            float phase = i / (float)Ring1Count * MathHelper.TwoPi;
+
+            float radius = 5.5f + MathF.Sin(i * 1.37f) * 0.35f;
+
+            float height =
+                MathF.Sin(i * 2.31f) * 0.8f;
+
+            sceneObjects.Add(new SceneObject
+            {
+                Mesh = cubeMesh,
+                Texture = i % 5 == 0 ? face : grid,
+
+                Position = new Vector3(
+                    MathF.Cos(phase) * radius,
+                    height,
+                    MathF.Sin(phase) * radius),
+
+                Scale = new Vector3(
+                    0.12f + (i % 4) * 0.04f),
+
+                Orbits = true,
+                OrbitRadius = radius,
+                OrbitSpeed = 0.45f + (i % 7) * 0.025f,
+                OrbitPhase = phase,
+
+                BobAmplitude = 0.15f + (i % 5) * 0.08f,
+                BobSpeed = 0.8f + (i % 9) * 0.15f,
+
+                SpinSpeed = -2f + (i % 11) * 0.4f
+            });
+        }
+
+
+        // ---------------------------------------------------------------------
+        // Orbital ring #2
+        // ---------------------------------------------------------------------
+
+        const int Ring2Count = 220;
+
+        for (int i = 0; i < Ring2Count; i++)
+        {
+            float phase = i / (float)Ring2Count * MathHelper.TwoPi;
+
+            float radius =
+                8f +
+                MathF.Sin(i * 0.71f) * 0.8f +
+                MathF.Cos(i * 1.17f) * 0.3f;
+
+            float height =
+                MathF.Sin(i * 0.37f) * 1.8f;
+
+            float size =
+                0.10f +
+                (i % 6) * 0.025f;
+
+            sceneObjects.Add(new SceneObject
+            {
+                Mesh = sphereMesh,
+                Texture = grid,
+
+                Position = new Vector3(
+                    MathF.Cos(phase) * radius,
+                    height,
+                    MathF.Sin(phase) * radius),
+
+                Scale = new Vector3(size),
+
+                Orbits = true,
+                OrbitRadius = radius,
+                OrbitSpeed =
+                    0.15f +
+                    (i % 13) * 0.018f,
+
+                OrbitPhase = phase,
+
+                BobAmplitude =
+                    0.25f +
+                    (i % 7) * 0.08f,
+
+                BobSpeed =
+                    0.5f +
+                    (i % 11) * 0.13f,
+
+                SpinSpeed =
+                    0.5f +
+                    (i % 9) * 0.25f
+            });
+        }
+
+
+        // ---------------------------------------------------------------------
+        // Orbital ring #3
+        // ---------------------------------------------------------------------
+
+        const int Ring3Count = 280;
+
+        for (int i = 0; i < Ring3Count; i++)
+        {
+            float phase =
+                i / (float)Ring3Count * MathHelper.TwoPi;
+
+            float radius =
+                11f +
+                MathF.Sin(i * 1.19f) * 1.2f;
+
+            float height =
+                MathF.Sin(i * 0.53f) * 3f;
+
+            sceneObjects.Add(new SceneObject
+            {
+                Mesh = cubeMesh,
+                Texture = i % 9 == 0 ? face : grid,
+
+                Position = new Vector3(
+                    MathF.Cos(phase) * radius,
+                    height,
+                    MathF.Sin(phase) * radius),
+
+                Scale = new Vector3(
+                    0.08f +
+                    (i % 5) * 0.035f),
+
+                Orbits = true,
+                OrbitRadius = radius,
+
+                OrbitSpeed =
+                    0.25f +
+                    (i % 17) * 0.025f,
+
+                OrbitPhase = phase,
+
+                BobAmplitude =
+                    0.2f +
+                    (i % 8) * 0.12f,
+
+                BobSpeed =
+                    0.6f +
+                    (i % 10) * 0.17f,
+
+                SpinSpeed =
+                    -4f +
+                    (i % 15) * 0.6f
+            });
+        }
+
+        System.Random random = new System.Random(1337);
+
+        const int FloatingCount = 450;
+
+        for (int i = 0; i < FloatingCount; i++)
+        {
+            float x = (float)(random.NextDouble() * 44.0 - 22.0);
+            float y = (float)(random.NextDouble() * 14.0 - 1.0);
+            float z = (float)(random.NextDouble() * 44.0 - 22.0);
+
+            float size =
+                0.5f +
+                (float)random.NextDouble() * 0.20f;
+
+            float orbitRadius =
+                MathF.Sqrt(x * x + z * z);
+
+            float phase =
+                MathF.Atan2(z, x);
+
+            if (orbitRadius < 2f)
+                orbitRadius = 2f;
+
+            sceneObjects.Add(new SceneObject
+            {
+                Mesh = i % 3 == 0 ? sphereMesh : cubeMesh,
+                Texture = i % 17 == 0 ? face : grid,
+
+                Position = new Vector3(x, y, z),
+
+                Scale = new Vector3(size),
+
+                Orbits = true,
+                OrbitRadius = orbitRadius,
+
+                OrbitSpeed =
+                    0.02f +
+                    (float)random.NextDouble() * 0.12f,
+
+                OrbitPhase = phase,
+
+                BobAmplitude =
+                    0.1f +
+                    (float)random.NextDouble() * 0.7f,
+
+                BobSpeed =
+                    0.3f +
+                    (float)random.NextDouble() * 2f,
+
+                SpinSpeed =
+                    -3f +
+                    (float)random.NextDouble() * 6f
+            });
+        }
+
+
+        // ---------------------------------------------------------------------
+        // Inner satellite swarm
+        // ---------------------------------------------------------------------
+
+        const int SatelliteCount = 130;
+
+        for (int i = 0; i < SatelliteCount; i++)
+        {
+            float phase =
+                i / (float)SatelliteCount * MathHelper.TwoPi;
+
+            float radius =
+                2f + (i % 6) * 0.25f;
+
+            sceneObjects.Add(new SceneObject
+            {
+                Mesh = cubeMesh,
+                Texture = i % 4 == 0 ? face : grid,
+
+                Position = new Vector3(
+                    MathF.Cos(phase) * radius,
+                    0,
+                    MathF.Sin(phase) * radius),
+
+                Scale = new Vector3(
+                    0.08f + (i % 3) * 0.025f),
+
+                Orbits = true,
+                OrbitRadius = radius,
+
+                OrbitSpeed =
+                    1.0f +
+                    (i % 10) * 0.08f,
+
+                OrbitPhase = phase,
+
+                BobAmplitude =
+                    0.1f +
+                    (i % 5) * 0.08f,
+
+                BobSpeed =
+                    1.5f +
+                    (i % 7) * 0.25f,
+
+                SpinSpeed =
+                    -5f +
+                    (i % 9) * 1.1f
+            });
+        }
+
+
+        // ---------------------------------------------------------------------
+        // Vertical towers of moving objects
+        // ---------------------------------------------------------------------
+
+        const int TowerCount = 18;
+        const int ObjectsPerTower = 20;
+
+        for (int tower = 0; tower < TowerCount; tower++)
+        {
+            float angle =
+                tower / (float)TowerCount * MathHelper.TwoPi;
+
+            float radius = 15f;
+
+            float towerX =
+                MathF.Cos(angle) * radius;
+
+            float towerZ =
+                MathF.Sin(angle) * radius;
+
+            for (int y = 0; y < ObjectsPerTower; y++)
+            {
+                float height =
+                    -0.5f + y * 0.8f;
+
+                sceneObjects.Add(new SceneObject
+                {
+                    Mesh = y % 2 == 0 ? cubeMesh : sphereMesh,
+                    Texture = y % 5 == 0 ? face : grid,
+
+                    Position = new Vector3(
+                        towerX,
+                        height,
+                        towerZ),
+
+                    Scale = new Vector3(
+                        0.12f + (y % 3) * 0.04f),
+
+                    Orbits = true,
+
+                    OrbitRadius =
+                        radius +
+                        MathF.Sin(y * 0.7f) * 0.8f,
+
+                    OrbitSpeed =
+                        0.05f +
+                        y * 0.008f,
+
+                    OrbitPhase =
+                        angle +
+                        y * 0.15f,
+
+                    BobAmplitude =
+                        0.15f +
+                        y * 0.02f,
+
+                    BobSpeed =
+                        0.7f +
+                        y * 0.1f,
+
+                    SpinSpeed =
+                        1f +
+                        y * 0.25f
+                });
+            }
+        }
+
+
+        // ---------------------------------------------------------------------
+        // Far background spheres
+        // ---------------------------------------------------------------------
+
+        const int FarCount = 40;
+
+        for (int i = 0; i < FarCount; i++)
+        {
+            float phase =
+                i / (float)FarCount * MathHelper.TwoPi;
+
+            float radius = 18f + (i % 3) * 2f;
+
+            sceneObjects.Add(new SceneObject
+            {
+                Mesh = sphereMesh,
+                Texture = face,
+
+                Position = new Vector3(
+                    MathF.Cos(phase) * radius,
+                    3f + MathF.Sin(phase * 3f),
+                    MathF.Sin(phase) * radius),
+
+                Scale = new Vector3(
+                    0.4f + (i % 4) * 0.15f),
+
+                Orbits = true,
+                OrbitRadius = radius,
+
+                OrbitSpeed =
+                    0.025f +
+                    i * 0.002f,
+
+                OrbitPhase = phase,
+
+                BobAmplitude = 1f,
+                BobSpeed = 0.2f + i * 0.03f,
+
+                SpinSpeed =
+                    0.2f +
+                    i * 0.05f
+            });
+        }
+
+
+        // ---------------------------------------------------------------------
+        // Spiral galaxy arms
+        // ---------------------------------------------------------------------
+
+        const int SpiralArms = 4;
+        const int PerArm = 150;
+
+        for (int arm = 0; arm < SpiralArms; arm++)
+        {
+            float armOffset = arm / (float)SpiralArms * MathHelper.TwoPi;
+
+            for (int i = 0; i < PerArm; i++)
+            {
+                float t = i / (float)PerArm;
+
+                float radius = 3f + t * 22f;
+
+                float phase = armOffset + t * MathHelper.TwoPi * 2.5f;
+
+                float height = MathF.Sin(t * MathHelper.TwoPi * 3f + arm) * 1.5f;
+
+                sceneObjects.Add(new SceneObject
+                {
+                    Mesh = i % 4 == 0 ? sphereMesh : cubeMesh,
+                    Texture = i % 6 == 0 ? face : grid,
+
+                    Position = new Vector3(
+                        MathF.Cos(phase) * radius,
+                        height,
+                        MathF.Sin(phase) * radius),
+
+                    Scale = new Vector3(0.06f + (1f - t) * 0.18f),
+
+                    Orbits = true,
+                    OrbitRadius = radius,
+                    OrbitSpeed = 0.08f + (1f - t) * 0.2f,
+                    OrbitPhase = phase,
+
+                    BobAmplitude = 0.2f + t * 0.6f,
+                    BobSpeed = 0.4f + (i % 7) * 0.1f,
+
+                    SpinSpeed = -2f + (i % 13) * 0.35f
+                });
+            }
+        }
+
+
+        // ---------------------------------------------------------------------
+        // Double helix
+        // ---------------------------------------------------------------------
+
+        const int HelixSegments = 220;
+        const float HelixHeight = 32f;
+        const float HelixRadius = 6.5f;
+        const float HelixTurns = 6f;
+
+        for (int strand = 0; strand < 2; strand++)
+        {
+            float strandOffset = strand * MathHelper.Pi;
+
+            for (int i = 0; i < HelixSegments; i++)
+            {
+                float t = i / (float)HelixSegments;
+
+                float phase = strandOffset + t * MathHelper.TwoPi * HelixTurns;
+
+                float height = -HelixHeight * 0.5f + t * HelixHeight;
+
+                sceneObjects.Add(new SceneObject
+                {
+                    Mesh = cubeMesh,
+                    Texture = strand == 0 ? face : grid,
+
+                    Position = new Vector3(
+                        MathF.Cos(phase) * HelixRadius,
+                        height,
+                        MathF.Sin(phase) * HelixRadius),
+
+                    Scale = new Vector3(0.14f),
+
+                    Orbits = true,
+                    OrbitRadius = HelixRadius,
+                    OrbitSpeed = 0.3f,
+                    OrbitPhase = phase,
+
+                    BobAmplitude = 0.05f,
+                    BobSpeed = 2f + strand,
+
+                    SpinSpeed = 3f * (strand == 0 ? 1f : -1f)
+                });
+            }
+        }
+
+        Console.WriteLine($"Created {sceneObjects.Count} scene objects.");
     }
 }
 
