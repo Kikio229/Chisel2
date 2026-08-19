@@ -84,6 +84,11 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
     private const uint _samplerCacheCapacity = 128;
     private CpuDescriptorHandle? _defaultSamplerHandle;
 
+    private readonly Dictionary<D3DImage, CpuDescriptorHandle> _imageDescriptorCache = new();
+    private D3DDescriptorHeap _imageDescriptorCacheHeap;
+    private uint _imageDescriptorCacheCursor;
+    private const uint _imageDescriptorCacheCapacity = 512;
+
     private uint _pendingSamplerMask;
     private readonly CpuDescriptorHandle[] _pendingSamplerWrites = new CpuDescriptorHandle[16];
     private bool _samplerTableCommitted;
@@ -185,6 +190,7 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
         _resourceHeap = new D3DDescriptorHeap((ID3D12Device*)_device.Get(), DescriptorHeapType.CbvSrvUav, _resourceHeapCapacity, shaderVisible: true);
         _samplerHeap = new D3DDescriptorHeap((ID3D12Device*)_device.Get(), DescriptorHeapType.Sampler, _samplerHeapCapacity, shaderVisible: true);
         _samplerCacheHeap = new D3DDescriptorHeap((ID3D12Device*)_device.Get(), DescriptorHeapType.Sampler, _samplerCacheCapacity, shaderVisible: false);
+        _imageDescriptorCacheHeap = new D3DDescriptorHeap((ID3D12Device*)_device.Get(), DescriptorHeapType.CbvSrvUav, _imageDescriptorCacheCapacity, shaderVisible: false);
 
         _backBufferStates = new ResourceStates[_frameCount];
 
@@ -781,18 +787,9 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
 
         BarrierTransition((ID3D12GraphicsCommandList*)_mainCmdList.Get(), d3dImage.Resource, ref d3dImage.State, ResourceStates.PixelShaderResource);
 
-        ShaderResourceViewDescription srvDesc = new ShaderResourceViewDescription
-        {
-            Format = D3DUtilities.GetDxgiFormatFromImage(d3dImage.Format),
-            ViewDimension = Vortice.Win32.Graphics.Direct3D12.SrvDimension.Texture2D,
-            Shader4ComponentMapping = 5768,
-            Anonymous = new ShaderResourceViewDescription._Anonymous_e__Union
-            {
-                Texture2D = new Texture2DSrv { MostDetailedMip = 0, MipLevels = d3dImage.MipLevels, PlaneSlice = 0, ResourceMinLODClamp = 0 }
-            }
-        };
-
-        _device.Get()->CreateShaderResourceView(d3dImage.Resource, &srvDesc, _resourceHeap.GetCpuAt(_currentSrvBase + slot));
+        CpuDescriptorHandle cachedSrv = GetOrCreateImageSrv(d3dImage);
+        CpuDescriptorHandle dst = _resourceHeap.GetCpuAt(_currentSrvBase + slot);
+        _device.Get()->CopyDescriptorsSimple(1, dst, cachedSrv, DescriptorHeapType.CbvSrvUav);
     }
 
     public void BindSampler(ISampler sampler, uint slot)
@@ -821,6 +818,8 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
             throw new ArgumentException("Graphics state must be a D3DGraphicsState created by this device!", nameof(gfxState));
         }
 
+        bool stateChanged = !ReferenceEquals(_boundGfxState, state);
+
         _boundGfxState = state;
         _boundCmpState = null;
         _pendingSamplerMask = 0;
@@ -828,9 +827,13 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
 
         AllocDescriptorBlockForDraw();
 
-        _mainCmdList.Get()->SetGraphicsRootSignature(state.RootSignature);
-        _mainCmdList.Get()->SetPipelineState(state.PipelineState);
-        _mainCmdList.Get()->IASetPrimitiveTopology(state.Topology);
+        if (stateChanged)
+        {
+            _mainCmdList.Get()->SetGraphicsRootSignature(state.RootSignature);
+            _mainCmdList.Get()->SetPipelineState(state.PipelineState);
+            _mainCmdList.Get()->IASetPrimitiveTopology(state.Topology);
+        }
+
         _mainCmdList.Get()->SetGraphicsRootDescriptorTable(_rootConstantBuffers, _resourceHeap.GetGpuAt(_currentCbvBase));
         _mainCmdList.Get()->SetGraphicsRootDescriptorTable(_rootShaderResources, _resourceHeap.GetGpuAt(_currentSrvBase));
         _mainCmdList.Get()->SetGraphicsRootDescriptorTable(_rootUnorderedAccess, _resourceHeap.GetGpuAt(_currentUavBase));
@@ -1351,6 +1354,7 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
             _renderHeap.Dispose();
             _resourceHeap.Dispose();
             _samplerHeap.Dispose();
+            _imageDescriptorCacheHeap.Dispose();
             _uploadCmdList.Dispose();
             _uploadCmdAlloc.Dispose();
             _uploadFence.Dispose();
@@ -1739,6 +1743,37 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
             SamplerWrapMode.Mirror => TextureAddressMode.Mirror,
             _ => throw new ArgumentOutOfRangeException(nameof(mode))
         };
+    }
+    private unsafe CpuDescriptorHandle GetOrCreateImageSrv(D3DImage d3dImage)
+    {
+        if (_imageDescriptorCache.TryGetValue(d3dImage, out CpuDescriptorHandle cached))
+        {
+            return cached;
+        }
+
+        if (_imageDescriptorCacheCursor >= _imageDescriptorCacheCapacity)
+        {
+            Logger.AppendWarn("Image SRV dedup cache exhausted (512 distinct textures) - reusing last slot.");
+            return _imageDescriptorCacheHeap.GetCpuAt(_imageDescriptorCacheCursor - 1);
+        }
+
+        CpuDescriptorHandle handle = _imageDescriptorCacheHeap.GetCpuAt(_imageDescriptorCacheCursor);
+        _imageDescriptorCacheCursor++;
+
+        ShaderResourceViewDescription srvDesc = new ShaderResourceViewDescription
+        {
+            Format = D3DUtilities.GetDxgiFormatFromImage(d3dImage.Format),
+            ViewDimension = Vortice.Win32.Graphics.Direct3D12.SrvDimension.Texture2D,
+            Shader4ComponentMapping = 5768,
+            Anonymous = new ShaderResourceViewDescription._Anonymous_e__Union
+            {
+                Texture2D = new Texture2DSrv { MostDetailedMip = 0, MipLevels = d3dImage.MipLevels, PlaneSlice = 0, ResourceMinLODClamp = 0 }
+            }
+        };
+
+        _device.Get()->CreateShaderResourceView(d3dImage.Resource, &srvDesc, handle);
+        _imageDescriptorCache[d3dImage] = handle;
+        return handle;
     }
     private unsafe CpuDescriptorHandle GetOrCreateCachedSampler(D3DSampler d3dSampler)
     {

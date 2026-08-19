@@ -161,9 +161,9 @@ public class TestGame : Game
         modelShader.Parameters["SunIntensity"]?.SetValue(0.6f);
         modelShader.Parameters["SunColor"]?.SetValue(new Vector4(1f, 0.95f, 0.85f, 1f));
 
-        Vector3 lightPos = new Vector3(MathF.Cos((float)elapsed) * 4f, 2.5f, MathF.Sin((float)elapsed) * 4f);
-        var positions = new[] { new Vector4(lightPos, 8f) };
-        var colors = new[] { new Vector4(1f, 0.85f, 0.6f, 2f) };
+        Vector3 lightPos = new Vector3(MathF.Cos(-(float)elapsed) * 8f, 2.5f, MathF.Sin(-(float)elapsed) * 8f);
+        var positions = new[] { new Vector4(lightPos, 16) };
+        var colors = new[] { new Vector4(1f, 0.85f, 0.6f, 1f) };
         var spotData = new[] { Vector4.Zero };
 
         modelShader.Parameters["RealtimeLightCount"]?.SetValue(1);
