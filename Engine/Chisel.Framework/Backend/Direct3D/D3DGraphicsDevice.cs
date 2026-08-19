@@ -97,7 +97,7 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
     // before needing to allocate their own buffers.
     // This means we will shell out some memory constantly to this "arena buffer", but it means that
     // smaller and simpler cbuffers can flood it quickly without allocating more memory every time they grow.
-    private ulong _cbufferArenaCapacity = 4 * 1024 * 1024;
+    private ulong _cbufferArenaCapacity = 32 * 1024 * 1024;
     private D3DBuffer[] _cbufferArenas;
     private unsafe void*[] _cbufferArenaMapped;
     private ulong[] _cbufferArenaCursor;
