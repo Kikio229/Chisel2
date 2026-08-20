@@ -45,7 +45,7 @@ public struct Vector4 : IEquatable<Vector4>, IFormattable
     public static Vector4 Zero => new Vector4(0f, 0f, 0f, 0f);
     public static Vector4 One => new Vector4(1f, 1f, 1f, 1f);
 
-    private readonly Vector128<float> _value;
+    private Vector128<float> _value;
 
     public Vector4()
     {

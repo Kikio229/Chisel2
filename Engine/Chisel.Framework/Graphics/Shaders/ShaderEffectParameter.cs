@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Numerics;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -113,6 +112,26 @@ public class ShaderEffectParameter
         {
             program.Parameters[name]?.SetValue(values);
         }
+    }
+    public void SetValue(ReadOnlySpan<Vector2> values)
+    {
+        foreach (ShaderPass program in effect.AllPrograms)
+            program.Parameters[name]?.SetValue(values);
+    }
+    public void SetValue(ReadOnlySpan<Vector3> values)
+    {
+        foreach (ShaderPass program in effect.AllPrograms)
+            program.Parameters[name]?.SetValue(values);
+    }
+    public void SetValue(ReadOnlySpan<Vector4> values)
+    {
+        foreach (ShaderPass program in effect.AllPrograms)
+            program.Parameters[name]?.SetValue(values);
+    }
+    public void SetValue(ReadOnlySpan<Matrix> values)
+    {
+        foreach (ShaderPass program in effect.AllPrograms)
+            program.Parameters[name]?.SetValue(values);
     }
 
     public void SetValue(IImage image)

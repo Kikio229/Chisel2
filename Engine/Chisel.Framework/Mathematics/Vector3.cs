@@ -37,7 +37,7 @@ public struct Vector3 : IEquatable<Vector3>, IFormattable
     public static Vector3 UnitY => new Vector3(0f, 1f, 0f);
     public static Vector3 UnitZ => new Vector3(0f, 0f, 1f);
 
-    private readonly Vector128<float> _value;
+    private Vector128<float> _value;
 
     public Vector3()
     {

@@ -25,7 +25,7 @@ public struct Vector2 : IEquatable<Vector2>, IFormattable
     public static Vector2 UnitX => new Vector2(1f, 0f);
     public static Vector2 UnitY => new Vector2(0f, 1f);
 
-    private readonly Vector128<float> _value;
+    private Vector128<float> _value;
 
     public Vector2()
     {

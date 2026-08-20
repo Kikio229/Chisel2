@@ -204,8 +204,8 @@ public struct Matrix : IEquatable<Matrix>, IFormattable
         0f, 0f, 1f, 0f,
         0f, 0f, 0f, 1f);
 
-    private readonly Vector256<float> _top;
-    private readonly Vector256<float> _bottom;
+    private Vector256<float> _top;
+    private Vector256<float> _bottom;
 
     public Matrix()
         : this(Vector256.Create(0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f), 
@@ -222,8 +222,8 @@ public struct Matrix : IEquatable<Matrix>, IFormattable
     }
 
     public Matrix(Vector4 vec0, Vector4 vec1, Vector4 vec2, Vector4 vec3) 
-        : this(Vector256.Create(vec0.X, vec0.Y, vec0.Z, vec0.W, vec1.X, vec1.Y, vec1.Z, vec1.Y), 
-               Vector256.Create(vec2.X, vec2.Y, vec2.Z, vec2.Y, vec3.X, vec3.Y, vec3.Z, vec3.Y))
+        : this(Vector256.Create(vec0.X, vec0.Y, vec0.Z, vec0.W, vec1.X, vec1.Y, vec1.Z, vec1.W), 
+               Vector256.Create(vec2.X, vec2.Y, vec2.Z, vec2.W, vec3.X, vec3.Y, vec3.Z, vec3.W))
     {
 
     }
@@ -752,7 +752,7 @@ public struct Matrix : IEquatable<Matrix>, IFormattable
         hasher.Add(M11);
         hasher.Add(M12);
         hasher.Add(M13);
-        hasher.Add(M13);
+        hasher.Add(M14);
         hasher.Add(M21);
         hasher.Add(M22);
         hasher.Add(M23);
