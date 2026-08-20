@@ -71,6 +71,21 @@ public class ConstantBuffer : IDisposable
         dirty = true;
     }
 
+    internal void Write<T>(in T value) where T : unmanaged
+    {
+        ReadOnlySpan<T> span = MemoryMarshal.CreateReadOnlySpan(in value, 1);
+        ReadOnlySpan<byte> bytes = MemoryMarshal.AsBytes(span);
+        data = bytes.ToArray();
+        dirty = true;
+    }
+
+    internal void WriteArray<T>(ReadOnlySpan<T> values) where T : unmanaged
+    {
+        ReadOnlySpan<byte> bytes = MemoryMarshal.AsBytes(values);
+        data = bytes.ToArray();
+        dirty = true;
+    }
+
     internal void WriteArray<T>(int offset, ReadOnlySpan<T> values) where T : unmanaged
     {
         ReadOnlySpan<byte> bytes = MemoryMarshal.AsBytes(values);

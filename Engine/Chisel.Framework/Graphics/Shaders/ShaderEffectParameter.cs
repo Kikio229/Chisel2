@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Numerics;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -59,6 +60,30 @@ public class ShaderEffectParameter
     }
 
     public void SetValue<T>(in T value) where T : unmanaged
+    {
+        foreach (ShaderPass program in effect.AllPrograms)
+        {
+            program.Parameters[name]?.SetValue(value);
+        }
+    }
+
+    public void SetValue(Vector2 value)
+    {
+        foreach (ShaderPass program in effect.AllPrograms)
+        {
+            program.Parameters[name]?.SetValue(value);
+        }
+    }
+
+    public void SetValue(Vector3 value)
+    {
+        foreach (ShaderPass program in effect.AllPrograms)
+        {
+            program.Parameters[name]?.SetValue(value);
+        }
+    }
+
+    public void SetValue(Vector4 value)
     {
         foreach (ShaderPass program in effect.AllPrograms)
         {

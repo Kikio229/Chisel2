@@ -2,6 +2,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
 namespace Chisel.Framework;
@@ -53,7 +54,8 @@ public class ShaderParameter
         }
         else if (Kind == ShaderParameterKind.BufferMember)
         {
-            buffer.Write(offset, value);
+            //buffer.Write(offset, value);
+            buffer.Write(value);
         }
         else
         {
@@ -66,7 +68,8 @@ public class ShaderParameter
         {
             throw new InvalidOperationException(Name + " is not a value parameter");
         }
-        buffer.WriteArray(offset, values);
+        //buffer.WriteArray(offset, values);
+        buffer.WriteArray(values);
     }
     public void SetValue(IImage image)
     {
