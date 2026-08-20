@@ -1,5 +1,4 @@
-﻿using Microsoft.Xna.Framework;
-using System.Linq;
+﻿using System.Linq;
 
 namespace Chisel.Framework.UI;
 
@@ -71,7 +70,7 @@ public abstract class UIObject(UILayoutOptions options)
                 localPos.Y = (pDim.Y - HalfExtents.Y) + CenterOffset.Y;
             }
 
-            return localPos.X * pRight + localPos.Y * pUp;
+            return pRight * localPos.X + pUp * localPos.Y;
         }
     }
 

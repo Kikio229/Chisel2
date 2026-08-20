@@ -5,7 +5,7 @@ namespace Chisel.Framework;
 
 public static class Random
 {
-    public static ulong Seed { get; private set; } = 0;
+    private static ulong _seed = 0;
 
     /* Bytes (8-bit) */
 
@@ -363,21 +363,21 @@ public static class Random
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static T GetValue<T>()
     {
-        Seed = (Seed + 1) * 1103515245 + 12345;
-        Seed = Seed % (ulong)DateTime.Now.Ticks;
+        _seed = (_seed + 1) * 1103515245 + 12345;
+        _seed = _seed % (ulong)DateTime.Now.Ticks;
 
         return Type.GetTypeCode(typeof(T)) switch
         {
-            TypeCode.SByte => (T)(object)(sbyte)(Seed / 65536),
-            TypeCode.Byte => (T)(object)(byte)(Seed / 65536),
-            TypeCode.Int16 => (T)(object)(short)(Seed / 65536),
-            TypeCode.UInt16 => (T)(object)(ushort)(Seed / 65536),
-            TypeCode.Int32 => (T)(object)(int)(Seed / 65536),
-            TypeCode.UInt32 => (T)(object)(uint)(Seed / 65536),
-            TypeCode.Int64 => (T)(object)(long)(Seed / 65536),
-            TypeCode.UInt64 => (T)(object)(ulong)(Seed / 65536),
-            TypeCode.Single => (T)(object)((float)(Seed % float.MaxValue) / 65536),
-            TypeCode.Double => (T)(object)((double)(Seed % double.MaxValue) / 65536),
+            TypeCode.SByte => (T)(object)(sbyte)(_seed / 65536),
+            TypeCode.Byte => (T)(object)(byte)(_seed / 65536),
+            TypeCode.Int16 => (T)(object)(short)(_seed / 65536),
+            TypeCode.UInt16 => (T)(object)(ushort)(_seed / 65536),
+            TypeCode.Int32 => (T)(object)(int)(_seed / 65536),
+            TypeCode.UInt32 => (T)(object)(uint)(_seed / 65536),
+            TypeCode.Int64 => (T)(object)(long)(_seed / 65536),
+            TypeCode.UInt64 => (T)(object)(ulong)(_seed / 65536),
+            TypeCode.Single => (T)(object)((float)(_seed % float.MaxValue) / 65536),
+            TypeCode.Double => (T)(object)((double)(_seed % double.MaxValue) / 65536),
             _ => throw new ArgumentException($"Random type of '{typeof(T)}' is not supported!")
         };
     }

@@ -1,6 +1,5 @@
 ﻿using Chisel.Framework;
 using Chisel.Framework.Utilities;
-using Microsoft.Xna.Framework;
 using System;
 using System.Collections.Generic;
 
@@ -85,10 +84,10 @@ public static class PrimitiveBuilder
 
         var verts = new ModelVertex[]
         {
-            new() { Position = new(-hw, 0,-hd), Normal = Vector3.Up, TexCoord = new(0, 0) },
-            new() { Position = new(-hw, 0, hd), Normal = Vector3.Up, TexCoord = new(0, tile.Y) },
-            new() { Position = new( hw, 0, hd), Normal = Vector3.Up, TexCoord = new(tile.X, tile.Y) },
-            new() { Position = new( hw, 0,-hd), Normal = Vector3.Up, TexCoord = new(tile.X, 0) },
+            new() { Position = new(-hw, 0,-hd), Normal = Vector3.UnitY, TexCoord = new(0, 0) },
+            new() { Position = new(-hw, 0, hd), Normal = Vector3.UnitY, TexCoord = new(0, tile.Y) },
+            new() { Position = new( hw, 0, hd), Normal = Vector3.UnitY, TexCoord = new(tile.X, tile.Y) },
+            new() { Position = new( hw, 0,-hd), Normal = Vector3.UnitY, TexCoord = new(tile.X, 0) },
         };
 
         var indices = new uint[] { 0, 1, 2, 2, 3, 0 };
@@ -178,8 +177,8 @@ public static class PrimitiveBuilder
             float denom = duv1.X * duv2.Y - duv2.X * duv1.Y;
             float f = MathF.Abs(denom) < 1e-8f ? 0f : 1f / denom;
 
-            Vector3 tangent = f * (duv2.Y * edge1 - duv1.Y * edge2);
-            Vector3 bitangent = f * (duv1.X * edge2 - duv2.X * edge1);
+            Vector3 tangent = (edge1 * duv2.Y - edge2 * duv1.Y) * f;
+            Vector3 bitangent = (edge2 * duv1.X - edge1 * duv2.X) * f;
 
             tan[i0] += tangent; tan[i1] += tangent; tan[i2] += tangent;
             bitan[i0] += bitangent; bitan[i1] += bitangent; bitan[i2] += bitangent;
@@ -188,13 +187,13 @@ public static class PrimitiveBuilder
         for (int i = 0; i < verts.Length; i++)
         {
             Vector3 n = verts[i].Normal;
-            Vector3 t = tan[i] - n * Vector3.Dot(n, tan[i]);
+            Vector3 t = tan[i] - n * n.DotProduct(tan[i]);
 
-            t = t.LengthSquared() > 1e-12f ? Vector3.Normalize(t) : ArbitraryTangent(n);
+            t = t.LengthSquared() > 1e-12f ? t.Normalize() : ArbitraryTangent(n);
 
-            Vector3 b = Vector3.Cross(n, t);
-            if (Vector3.Dot(b, bitan[i]) < 0f)
-                b = -b;
+            Vector3 b = n.CrossProduct(t);
+            if (b.DotProduct(bitan[i]) < 0f)
+                b = b.Negate();
 
             verts[i].Tangent = t;
             verts[i].Binormal = b;
@@ -203,8 +202,8 @@ public static class PrimitiveBuilder
 
     static Vector3 ArbitraryTangent(Vector3 n)
     {
-        Vector3 up = MathF.Abs(n.Y) < 0.99f ? Vector3.Up : Vector3.Right;
-        return Vector3.Normalize(Vector3.Cross(up, n));
+        Vector3 up = MathF.Abs(n.Y) < 0.99f ? Vector3.UnitY : Vector3.UnitX;
+        return up.CrossProduct(n).Normalize();
     }
 }
 

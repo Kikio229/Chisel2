@@ -1,7 +1,6 @@
 ﻿using Chisel.Framework;
 using Chisel.Framework.Utilities;
 using Chisel.Resource;
-using Microsoft.Xna.Framework;
 using Silk.NET.OpenGL;
 using System;
 using System.Collections.Generic;
@@ -27,7 +26,7 @@ public class TestGame : Game
 
     // Camera state
     Vector3 cameraPosition = new Vector3(0, 1.5f, 4f);
-    float yaw = -MathHelper.PiOver2; // facing -Z toward the cube
+    float yaw = -MathUtilities.PiOverTwoF; // facing -Z toward the cube
     float pitch = 0f;
     const float MouseSensitivity = 0.0025f;
     const float MoveSpeed = 4f;
@@ -91,8 +90,8 @@ public class TestGame : Game
     void UpdateProjection()
     {
         float aspect = Window.Resolution.W / (float)Window.Resolution.H;
-        projection = Matrix.CreatePerspectiveFieldOfView(
-            MathHelper.ToRadians(70f), aspect, 0.1f, 100f);
+        projection = Matrix.FromPerspectiveFov(
+            70f * MathUtilities.Deg2RadF, aspect, 0.1f, 100f);
     }
 
     protected override void OnWindowResize(int width, int height)
@@ -114,19 +113,19 @@ public class TestGame : Game
             Vector2 md = InputManager.MouseDelta;
             yaw += md.X * MouseSensitivity;
             pitch -= md.Y * MouseSensitivity;
-            pitch = MathHelper.Clamp(pitch, -MathHelper.PiOver2 + 0.01f, MathHelper.PiOver2 - 0.01f);
+            pitch = pitch.Clamp(-MathUtilities.PiOverTwoF + 0.01f, MathUtilities.PiOverTwoF - 0.01f);
         }
         else
         {
             Window.SetCursorMode(CursorMode.Normal);
         }
 
-        forward = Vector3.Normalize(new Vector3(
+        forward = new Vector3(
             MathF.Cos(pitch) * MathF.Cos(yaw),
             MathF.Sin(pitch),
-            MathF.Cos(pitch) * MathF.Sin(yaw)));
+            MathF.Cos(pitch) * MathF.Sin(yaw)).Normalize();
 
-        Vector3 right = Vector3.Normalize(Vector3.Cross(forward, Vector3.Up));
+        Vector3 right = forward.CrossProduct(Vector3.UnitY).Normalize();
 
         float speed = InputManager.IsInputHeld(Input.KeyLShift) ? FastMoveSpeed : MoveSpeed;
         float move = speed * (float)delta;
@@ -136,7 +135,7 @@ public class TestGame : Game
         if (InputManager.IsInputHeld(Input.KeyA)) cameraPosition -= right * move;
         if (InputManager.IsInputHeld(Input.KeyD)) cameraPosition += right * move;
 
-        view = Matrix.CreateLookAt(cameraPosition, cameraPosition + forward, Vector3.Up);
+        view = Matrix.FromLookAt(cameraPosition, cameraPosition + forward, Vector3.UnitY);
     }
 
     protected override void OnDrawFrame(double delta)
@@ -156,13 +155,13 @@ public class TestGame : Game
         modelShader.Parameters["Time"]?.SetValue((float)elapsed);
         modelShader.Parameters["ScreenSize"]?.SetValue(new Vector2(Window.Resolution.W, Window.Resolution.H));
 
-        Vector3 sunDir = Vector3.Normalize(new Vector3(-0.4f, -1f, -0.3f));
+        Vector3 sunDir = new Vector3(-0.4f, -1f, -0.3f).Normalize();
         modelShader.Parameters["SunDirection"]?.SetValue(sunDir);
         modelShader.Parameters["SunIntensity"]?.SetValue(0.6f);
         modelShader.Parameters["SunColor"]?.SetValue(new Vector4(1f, 0.95f, 0.85f, 1f));
 
         Vector3 lightPos = new Vector3(MathF.Cos(-(float)elapsed) * 8f, 2.5f, MathF.Sin(-(float)elapsed) * 8f);
-        var positions = new[] { new Vector4(lightPos, 16) };
+        var positions = new[] { new Vector4(lightPos.X, lightPos.Y, lightPos.Z, 16) };
         var colors = new[] { new Vector4(1f, 0.85f, 0.6f, 1f) };
         var spotData = new[] { Vector4.Zero };
 
@@ -178,7 +177,7 @@ public class TestGame : Game
         foreach (var obj in sceneObjects)
         {
             Matrix world = obj.GetWorld(elapsed);
-            Matrix worldInverseTranspose = Matrix.Transpose(Matrix.Invert(world));
+            Matrix worldInverseTranspose = world.Invert().Transpose();
 
             modelShader.Parameters["World"]?.SetValue(world);
             modelShader.Parameters["WorldInverseTranspose"]?.SetValue(worldInverseTranspose);
@@ -197,7 +196,7 @@ public class TestGame : Game
 
         screenTexture.End();
 
-        spriteBatch.Begin(Matrix.CreateOrthographicOffCenter(0, Window.Resolution.W, Window.Resolution.H, 0, 0, 1));
+        spriteBatch.Begin(Matrix.FromOrthographic(0, Window.Resolution.W, Window.Resolution.H, 0, 0, 1));
         spriteBatch.Draw(screenTexture, Vector2.Zero, new(Window.Resolution.W, Window.Resolution.H), Color.White);
         spriteBatch.End();
 
@@ -263,7 +262,7 @@ public class TestGame : Game
         // Large central spheres
         for (int i = 0; i < 8; i++)
         {
-            float angle = i / 8f * MathHelper.TwoPi;
+            float angle = i / 8f * MathUtilities.TauF;
 
             float radius = 3.2f;
 
@@ -300,7 +299,7 @@ public class TestGame : Game
 
         for (int i = 0; i < Ring1Count; i++)
         {
-            float phase = i / (float)Ring1Count * MathHelper.TwoPi;
+            float phase = i / (float)Ring1Count * MathUtilities.TauF;
 
             float radius = 5.5f + MathF.Sin(i * 1.37f) * 0.35f;
 
@@ -341,7 +340,7 @@ public class TestGame : Game
 
         for (int i = 0; i < Ring2Count; i++)
         {
-            float phase = i / (float)Ring2Count * MathHelper.TwoPi;
+            float phase = i / (float)Ring2Count * MathUtilities.TauF;
 
             float radius =
                 8f +
@@ -399,7 +398,7 @@ public class TestGame : Game
         for (int i = 0; i < Ring3Count; i++)
         {
             float phase =
-                i / (float)Ring3Count * MathHelper.TwoPi;
+                i / (float)Ring3Count * MathUtilities.TauF;
 
             float radius =
                 11f +
@@ -510,7 +509,7 @@ public class TestGame : Game
         for (int i = 0; i < SatelliteCount; i++)
         {
             float phase =
-                i / (float)SatelliteCount * MathHelper.TwoPi;
+                i / (float)SatelliteCount * MathUtilities.TauF;
 
             float radius =
                 2f + (i % 6) * 0.25f;
@@ -562,7 +561,7 @@ public class TestGame : Game
         for (int tower = 0; tower < TowerCount; tower++)
         {
             float angle =
-                tower / (float)TowerCount * MathHelper.TwoPi;
+                tower / (float)TowerCount * MathUtilities.TauF;
 
             float radius = 15f;
 
@@ -629,7 +628,7 @@ public class TestGame : Game
         for (int i = 0; i < FarCount; i++)
         {
             float phase =
-                i / (float)FarCount * MathHelper.TwoPi;
+                i / (float)FarCount * MathUtilities.TauF;
 
             float radius = 18f + (i % 3) * 2f;
 
@@ -674,7 +673,7 @@ public class TestGame : Game
 
         for (int arm = 0; arm < SpiralArms; arm++)
         {
-            float armOffset = arm / (float)SpiralArms * MathHelper.TwoPi;
+            float armOffset = arm / (float)SpiralArms * MathUtilities.TauF;
 
             for (int i = 0; i < PerArm; i++)
             {
@@ -682,9 +681,9 @@ public class TestGame : Game
 
                 float radius = 3f + t * 22f;
 
-                float phase = armOffset + t * MathHelper.TwoPi * 2.5f;
+                float phase = armOffset + t * MathUtilities.TauF * 2.5f;
 
-                float height = MathF.Sin(t * MathHelper.TwoPi * 3f + arm) * 1.5f;
+                float height = MathF.Sin(t * MathUtilities.TauF * 3f + arm) * 1.5f;
 
                 sceneObjects.Add(new SceneObject
                 {
@@ -723,13 +722,13 @@ public class TestGame : Game
 
         for (int strand = 0; strand < 2; strand++)
         {
-            float strandOffset = strand * MathHelper.Pi;
+            float strandOffset = strand * MathUtilities.PiF;
 
             for (int i = 0; i < HelixSegments; i++)
             {
                 float t = i / (float)HelixSegments;
 
-                float phase = strandOffset + t * MathHelper.TwoPi * HelixTurns;
+                float phase = strandOffset + t * MathUtilities.TauF * HelixTurns;
 
                 float height = -HelixHeight * 0.5f + t * HelixHeight;
 

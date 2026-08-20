@@ -1,5 +1,4 @@
 ﻿using Chisel.Framework;
-using Microsoft.Xna.Framework;
 using System;
 
 public class SceneObject
@@ -36,8 +35,8 @@ public class SceneObject
         if (BobAmplitude != 0f)
             pos.Y += MathF.Sin((float)elapsed * BobSpeed) * BobAmplitude;
 
-        return Matrix.CreateScale(Scale)
-             * Matrix.CreateRotationY((float)elapsed * SpinSpeed)
-             * Matrix.CreateTranslation(pos);
+        return Matrix.FromScale(Scale)
+             * Matrix.FromRotationY((float)elapsed * SpinSpeed)
+             * Matrix.FromTranslation(pos);
     }
 }

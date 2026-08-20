@@ -1,7 +1,6 @@
 ﻿
 using Chisel.Resource;
 using Hexa.NET.SDL3;
-using Microsoft.Xna.Framework; // TODO: Change the XNA namespace
 using Silk.NET.OpenGL;
 using System;
 using System.Collections.Generic;

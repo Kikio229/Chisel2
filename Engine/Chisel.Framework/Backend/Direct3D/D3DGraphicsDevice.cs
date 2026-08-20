@@ -1,7 +1,6 @@
 ﻿using Chisel.Framework.Backend.Direct3D;
 using Chisel.Resource;
 using Hexa.NET.SDL3;
-using Microsoft.Xna.Framework; // TODO: Change the XNA namespace
 using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;

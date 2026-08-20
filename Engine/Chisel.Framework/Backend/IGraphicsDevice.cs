@@ -1,5 +1,4 @@
 ﻿using System;
-using Microsoft.Xna.Framework; // TODO: Change the XNA namespace
 using Chisel.Resource;
 
 namespace Chisel.Framework;

@@ -2,7 +2,6 @@
 using Chisel.Framework.UI;
 using Chisel.Resource;
 using FontStashSharp;
-using Microsoft.Xna.Framework;
 using Silk.NET.OpenGL;
 using System;
 using System.Collections.Generic;
