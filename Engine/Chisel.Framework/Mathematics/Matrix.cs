@@ -580,9 +580,21 @@ public struct Matrix : IEquatable<Matrix>, IFormattable
         Matrix result = Matrix.Zero;
 
         result.M11 = scale.X;
+        result.M12 = 0;
+        result.M13 = 0;
+        result.M14 = 0;
+        result.M21 = 0;
         result.M22 = scale.Y;
+        result.M23 = 0;
+        result.M24 = 0;
+        result.M31 = 0;
+        result.M32 = 0;
         result.M33 = scale.Z;
-        result.M44 = 1f;
+        result.M34 = 0;
+        result.M41 = 0;
+        result.M42 = 0;
+        result.M43 = 0;
+        result.M44 = 1;
 
         return result;
     }
@@ -591,30 +603,28 @@ public struct Matrix : IEquatable<Matrix>, IFormattable
     /// Returns a view matrix
     /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Matrix FromLookAt(Vector3 position, Vector3 target, Vector3 up)
+    public static Matrix FromLookAt(Vector3 cameraPosition, Vector3 cameraTarget, Vector3 cameraUpVector)
     {
         Matrix result = Matrix.Zero;
 
-        Vector3 vectorA = (position - target).Normalize();
-        Vector3 vectorB = up.CrossProduct(vectorA).Normalize();
-        Vector3 vectorC = vectorA.CrossProduct(vectorB);
-
-        result.M11 = vectorB.X;
-        result.M12 = vectorC.X;
-        result.M13 = vectorA.X;
-
-        result.M21 = vectorB.Y;
-        result.M22 = vectorC.Y;
-        result.M23 = vectorA.Y;
-
-        result.M31 = vectorB.Z;
-        result.M32 = vectorC.Z;
-        result.M33 = vectorA.Z;
-
-        result.M41 = -vectorB.DotProduct(position);
-        result.M42 = -vectorC.DotProduct(position);
-        result.M43 = -vectorA.DotProduct(position);
-
+        var vector = (cameraPosition - cameraTarget).Normalize();
+        var vector2 = (cameraUpVector.CrossProduct(vector)).Normalize();
+        var vector3 = vector.CrossProduct(vector2);
+        result.M11 = vector2.X;
+        result.M12 = vector3.X;
+        result.M13 = vector.X;
+        result.M14 = 0f;
+        result.M21 = vector2.Y;
+        result.M22 = vector3.Y;
+        result.M23 = vector.Y;
+        result.M24 = 0f;
+        result.M31 = vector2.Z;
+        result.M32 = vector3.Z;
+        result.M33 = vector.Z;
+        result.M34 = 0f;
+        result.M41 = -vector2.DotProduct(cameraPosition);
+        result.M42 = -vector3.DotProduct(cameraPosition);
+        result.M43 = -vector.DotProduct(cameraPosition);
         result.M44 = 1f;
 
         return result;
@@ -697,6 +707,7 @@ public struct Matrix : IEquatable<Matrix>, IFormattable
 
         result.M11 = xScale;
         result.M22 = yScale;
+        result.M31 = result.M32 = 0.0f;
         result.M33 = negFarRange;
         result.M34 = -1.0f;
         result.M43 = near * negFarRange;
@@ -893,30 +904,41 @@ public struct Matrix : IEquatable<Matrix>, IFormattable
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Matrix Multiply(Matrix left, Matrix right)
     {
-        if (Avx.IsSupported)
-        {
-            Vector256<float> top, bottom;
-            top = Avx.Multiply(left._top, right._top);
-            bottom = Avx.Multiply(left._bottom, right._bottom);
-            return new Matrix(top, bottom);
-        }
+        Matrix result = default;
 
-        return new Matrix(left.M11 * right.M11,
-            left.M12 * right.M12,
-            left.M13 * right.M13,
-            left.M14 * right.M14,
-            left.M21 * right.M21,
-            left.M22 * right.M22,
-            left.M23 * right.M23,
-            left.M24 * right.M24,
-            left.M31 * right.M31,
-            left.M32 * right.M32,
-            left.M33 * right.M33,
-            left.M34 * right.M34,
-            left.M41 * right.M41,
-            left.M42 * right.M42,
-            left.M43 * right.M43,
-            left.M44 * right.M44);
+        var m11 = (((left.M11 * right.M11) + (left.M12 * right.M21)) + (left.M13 * right.M31)) + (left.M14 * right.M41);
+        var m12 = (((left.M11 * right.M12) + (left.M12 * right.M22)) + (left.M13 * right.M32)) + (left.M14 * right.M42);
+        var m13 = (((left.M11 * right.M13) + (left.M12 * right.M23)) + (left.M13 * right.M33)) + (left.M14 * right.M43);
+        var m14 = (((left.M11 * right.M14) + (left.M12 * right.M24)) + (left.M13 * right.M34)) + (left.M14 * right.M44);
+        var m21 = (((left.M21 * right.M11) + (left.M22 * right.M21)) + (left.M23 * right.M31)) + (left.M24 * right.M41);
+        var m22 = (((left.M21 * right.M12) + (left.M22 * right.M22)) + (left.M23 * right.M32)) + (left.M24 * right.M42);
+        var m23 = (((left.M21 * right.M13) + (left.M22 * right.M23)) + (left.M23 * right.M33)) + (left.M24 * right.M43);
+        var m24 = (((left.M21 * right.M14) + (left.M22 * right.M24)) + (left.M23 * right.M34)) + (left.M24 * right.M44);
+        var m31 = (((left.M31 * right.M11) + (left.M32 * right.M21)) + (left.M33 * right.M31)) + (left.M34 * right.M41);
+        var m32 = (((left.M31 * right.M12) + (left.M32 * right.M22)) + (left.M33 * right.M32)) + (left.M34 * right.M42);
+        var m33 = (((left.M31 * right.M13) + (left.M32 * right.M23)) + (left.M33 * right.M33)) + (left.M34 * right.M43);
+        var m34 = (((left.M31 * right.M14) + (left.M32 * right.M24)) + (left.M33 * right.M34)) + (left.M34 * right.M44);
+        var m41 = (((left.M41 * right.M11) + (left.M42 * right.M21)) + (left.M43 * right.M31)) + (left.M44 * right.M41);
+        var m42 = (((left.M41 * right.M12) + (left.M42 * right.M22)) + (left.M43 * right.M32)) + (left.M44 * right.M42);
+        var m43 = (((left.M41 * right.M13) + (left.M42 * right.M23)) + (left.M43 * right.M33)) + (left.M44 * right.M43);
+        var m44 = (((left.M41 * right.M14) + (left.M42 * right.M24)) + (left.M43 * right.M34)) + (left.M44 * right.M44);
+        result.M11 = m11;
+        result.M12 = m12;
+        result.M13 = m13;
+        result.M14 = m14;
+        result.M21 = m21;
+        result.M22 = m22;
+        result.M23 = m23;
+        result.M24 = m24;
+        result.M31 = m31;
+        result.M32 = m32;
+        result.M33 = m33;
+        result.M34 = m34;
+        result.M41 = m41;
+        result.M42 = m42;
+        result.M43 = m43;
+        result.M44 = m44;
+        return result;
     }
 
     /// <summary>
