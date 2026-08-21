@@ -218,6 +218,16 @@ public struct Color : IEquatable<Color>, IFormattable
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public Vector4 ToVector4Normalized()
+    {
+        return new Vector4(
+            R / 255f, 
+            G / 255f, 
+            B / 255f, 
+            A / 255f);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public readonly bool Equals(Color other)
     {
         return _value == other._value;

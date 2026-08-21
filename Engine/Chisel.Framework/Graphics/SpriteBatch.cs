@@ -172,7 +172,7 @@ public class SpriteBatch : IDisposable
     }
     void QueueSprite(Texture2D texture, Vector2 position, Vector2 size, Color color, Vector2 uvMin, Vector2 uvMax, float rotation, Vector2 origin)
     {
-        Vector4 col = color.ToVector4();
+        Vector4 col = color.ToVector4Normalized();
 
         Vector2 local0 = Vector2.Zero;
         Vector2 local1 = new Vector2(size.X, 0);

@@ -448,7 +448,7 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
     {
         if (flags.HasFlag(GraphicsClearFlags.Color))
         {
-            Vector4 cc = clearColor.ToVector4();
+            Vector4 cc = clearColor.ToVector4Normalized();
             float* rgba = stackalloc float[4] { cc.X, cc.Y, cc.Z, cc.W };
 
             CpuDescriptorHandle[] rtvs;
