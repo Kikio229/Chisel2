@@ -9,9 +9,9 @@ public struct BoundingSphere : IEquatable<BoundingSphere>, IFormattable
     public Vector3 Center { get; private set; }
 
     public BoundingSphere() 
-        : this(Vector3.Zero, 0f)
     {
-
+        Radius = 0f;
+        Center = Vector3.Zero;
     }
 
     public BoundingSphere(Vector3 center, float radius)

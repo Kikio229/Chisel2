@@ -9,9 +9,9 @@ public struct Ray : IEquatable<Ray>, IFormattable
     public Vector3 Direction { get; set; }
 
     public Ray()
-        : this(Vector3.Zero, Vector3.Zero)
     {
-
+        Position = Vector3.Zero;
+        Direction = Vector3.Zero;
     }
 
     public Ray(Vector3 position, Vector3 direction)

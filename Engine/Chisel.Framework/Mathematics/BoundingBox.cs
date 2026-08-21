@@ -10,9 +10,9 @@ public struct BoundingBox : IEquatable<BoundingBox>, IFormattable
     public const int CornerCount = 8;
 
     public BoundingBox()
-        : this(Vector3.Zero, Vector3.Zero)
     {
-
+        Min = Vector3.Zero;
+        Max = Vector3.Zero;
     }
 
     public BoundingBox(Vector3 min, Vector3 max)

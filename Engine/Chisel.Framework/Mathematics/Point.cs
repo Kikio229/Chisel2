@@ -11,13 +11,14 @@ public struct Point : IEquatable<Point>, IFormattable
     public Point()
         : this(0, 0)
     {
- 
+        X = 0;
+        Y = 0;
     }
 
     public Point(int val)
-        : this(val, val)
     {
-
+        X = val;
+        Y = val;
     }
 
     public Point(int x, int y)

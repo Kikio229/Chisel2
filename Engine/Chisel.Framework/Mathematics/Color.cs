@@ -179,7 +179,7 @@ public struct Color : IEquatable<Color>, IFormattable
 
     public Color()
     {
-        
+        _value = 0xFF000000;
     }
 
     public Color(uint packed)
@@ -190,20 +190,26 @@ public struct Color : IEquatable<Color>, IFormattable
     public Color(float r, float g, float b) 
         : this(r, g, b, 255)
     {
-
+        _value = (255u << 24) |
+          ((uint)(Math.Clamp(b, 0.0f, 1.0f) * 255) << 16) |
+          ((uint)(Math.Clamp(g, 0.0f, 1.0f) * 255) << 8) |
+          (uint)(Math.Clamp(r, 0.0f, 1.0f) * 255);
     }
 
     public Color(float r, float g, float b, float a) 
         : this((byte)(Math.Clamp(r, 0.0f, 1.0f) * 255), (byte)(Math.Clamp(g, 0.0f, 1.0f) * 255),
                (byte)(Math.Clamp(b, 0.0f, 1.0f) * 255), (byte)(Math.Clamp(a, 0.0f, 1.0f) * 255))
     {
-
+        _value = ((uint)(Math.Clamp(a, 0.0f, 1.0f) * 255) << 24) | 
+                 ((uint)(Math.Clamp(b, 0.0f, 1.0f) * 255) << 16) | 
+                 ((uint)(Math.Clamp(g, 0.0f, 1.0f) * 255) << 8) | 
+                 (uint)(Math.Clamp(r, 0.0f, 1.0f) * 255);
     }
 
     public Color(byte r, byte g, byte b) 
         : this(r, g, b, 255)
     {
-
+        _value = (255u << 24) | ((uint)b << 16) | ((uint)g << 8) | (r);
     }
 
     public Color(byte r, byte g, byte b, byte a)

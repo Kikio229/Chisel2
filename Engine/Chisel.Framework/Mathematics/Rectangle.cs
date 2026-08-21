@@ -43,9 +43,11 @@ public struct Rectangle : IEquatable<Rectangle>, IFormattable
     public static Rectangle Empty = new Rectangle(0, 0, 0, 0);
 
     public Rectangle()
-        : this(0, 0, 0, 0)
     {
-
+        X = 0;
+        Y = 0;
+        Width = 0;
+        Height = 0;
     }
 
     public Rectangle(int x, int y, int width, int height)

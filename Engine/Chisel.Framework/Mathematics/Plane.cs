@@ -9,27 +9,27 @@ public struct Plane : IEquatable<Plane>, IFormattable
     public Vector3 Normal { get; private set; }
 
     public Plane()  
-        : this(0f, 0f, 0f, 0f)
     {
-
+        Distance = 0f; 
+        Normal = Vector3.Zero;
     }
 
     public Plane(float distance, Vector3 normal) 
-        : this(normal.X, normal.Y, normal.Z, distance)
     {
-
-    }
-
-    public Plane(Vector4 vec) 
-        : this(vec.X, vec.Y, vec.Z, vec.W)
-    {
-  
+        Distance = distance;
+        Normal = normal;
     }
 
     public Plane(float x, float y, float z, float w)
     {
         Distance = w;
         Normal = new Vector3(x, y, z);
+    }
+
+    public Plane(Vector4 vec)
+    {
+        Distance = vec.W;
+        Normal = vec.XYZ;
     }
 
     public Plane(Vector3 vec1, Vector3 vec2, Vector3 vec3)

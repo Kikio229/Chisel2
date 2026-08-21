@@ -40,19 +40,17 @@ public struct Quaternion : IEquatable<Quaternion>, IFormattable
     public Quaternion()
         : this(0f, 0f, 0f, 0f)
     {
-
+        _value = Vector128.Create(0f, 0f, 0f, 0f);
     }
 
     public Quaternion(float val)
-        : this(val, val, val, val)
     {
-
+        _value = Vector128.Create(val, val, val, val);
     }
 
     public Quaternion(float x, float y, float z, float w)
-        : this(Vector128.Create(x, y, z, w))
     {
-
+        _value = Vector128.Create(x, y, z, w);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
