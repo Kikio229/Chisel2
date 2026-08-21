@@ -242,7 +242,7 @@ public class GLGraphicsDevice : Disposable, IGraphicsDevice
 
     public void Clear(Color clearColor, float clearDepth, int clearStencil, GraphicsClearFlags flags)
     {
-        Vector4 cc = clearColor.ToVector4();
+        Vector4 cc = clearColor.ToVector4Normalized();
         gl.ClearColor(cc.X, cc.Y, cc.Z, cc.W);
         gl.ClearDepth(clearDepth);
         gl.ClearStencil(clearStencil);
