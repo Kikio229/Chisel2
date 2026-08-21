@@ -222,7 +222,7 @@ public class TestGame : Game
 
         cubeMesh = new MeshBuffers(
             GraphicsDevice,
-            PrimitiveBuilder.CreateCube(1f));
+            PrimitiveBuilder.CreateCube(1f, new Vector2(1, 1)));
 
         sphereMesh = new MeshBuffers(
             GraphicsDevice,
