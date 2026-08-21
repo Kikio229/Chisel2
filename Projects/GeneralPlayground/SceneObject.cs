@@ -22,7 +22,7 @@ public class SceneObject
     public float Shininess = 8f;
     public bool Transparent = false;
 
-    public Matrix GetWorld(double elapsed)
+    public Matrix4 GetWorld(double elapsed)
     {
         Vector3 pos = Position;
 
@@ -35,8 +35,8 @@ public class SceneObject
         if (BobAmplitude != 0f)
             pos.Y += MathF.Sin((float)elapsed * BobSpeed) * BobAmplitude;
 
-        return Matrix.FromScale(Scale)
-             * Matrix.FromRotationY((float)elapsed * SpinSpeed)
-             * Matrix.FromTranslation(pos);
+        return Matrix4.FromScale(Scale)
+             * Matrix4.FromRotationY((float)elapsed * SpinSpeed)
+             * Matrix4.FromTranslation(pos);
     }
 }

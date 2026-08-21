@@ -90,7 +90,7 @@ public class ShaderEffectParameter
         }
     }
 
-    public void SetValue(Matrix value)
+    public void SetValue(Matrix4 value)
     {
         foreach (ShaderPass program in effect.AllPrograms)
         {
@@ -128,7 +128,7 @@ public class ShaderEffectParameter
         foreach (ShaderPass program in effect.AllPrograms)
             program.Parameters[name]?.SetValue(values);
     }
-    public void SetValue(ReadOnlySpan<Matrix> values)
+    public void SetValue(ReadOnlySpan<Matrix4> values)
     {
         foreach (ShaderPass program in effect.AllPrograms)
             program.Parameters[name]?.SetValue(values);

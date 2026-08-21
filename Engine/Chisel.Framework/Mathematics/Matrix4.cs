@@ -6,7 +6,7 @@ using System.Runtime.Intrinsics.X86;
 
 namespace Chisel.Framework;
 
-public struct Matrix : IEquatable<Matrix>, IFormattable
+public struct Matrix4 : IEquatable<Matrix4>, IFormattable
 {
     // Row 1
 
@@ -196,36 +196,35 @@ public struct Matrix : IEquatable<Matrix>, IFormattable
         }
     }
      
-    public static Matrix Zero => new Matrix(0f);
-    public static Matrix One => new Matrix(1f);
-    public static Matrix Identity = new Matrix(
+    public static Matrix4 Zero => new Matrix4(0f);
+    public static Matrix4 One => new Matrix4(1f);
+    public static Matrix4 Identity = new Matrix4(
         1f, 0f, 0f, 0f,
         0f, 1f, 0f, 0f,
         0f, 0f, 1f, 0f,
         0f, 0f, 0f, 1f);
 
-    private Vector256<float> _top;
-    private Vector256<float> _bottom;
+    private Vector256<float> _top, _bottom;
 
-    public Matrix()
+    public Matrix4()
     {
         _top = Vector256.Create(0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f);
         _bottom = Vector256.Create(0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f);
     }
 
-    public Matrix(float val)
+    public Matrix4(float val)
     {
         _top = Vector256.Create(val, val, val, val, val, val, val, val);
         _bottom = Vector256.Create(val, val, val, val, val, val, val, val);
     }
 
-    public Matrix(Vector4 vec0, Vector4 vec1, Vector4 vec2, Vector4 vec3) 
+    public Matrix4(Vector4 vec1, Vector4 vec2, Vector4 vec3, Vector4 vec4) 
     {
-        _top = Vector256.Create(vec0.X, vec0.Y, vec0.Z, vec0.W, vec1.X, vec1.Y, vec1.Z, vec1.W);
-        _bottom = Vector256.Create(vec2.X, vec2.Y, vec2.Z, vec2.W, vec3.X, vec3.Y, vec3.Z, vec3.W);
+        _top = Vector256.Create(vec1.X, vec1.Y, vec1.Z, vec1.W, vec2.X, vec2.Y, vec2.Z, vec2.W);
+        _bottom = Vector256.Create(vec2.X, vec3.Y, vec3.Z, vec3.W, vec4.X, vec4.Y, vec4.Z, vec4.W);
     }
 
-    public Matrix(float m11, float m12, float m13, float m14, float m21, float m22, float m23, float m24,
+    public Matrix4(float m11, float m12, float m13, float m14, float m21, float m22, float m23, float m24,
         float m31, float m32, float m33, float m34, float m41, float m42, float m43, float m44)
     {
         _top = Vector256.Create(m11, m12, m13, m14, m21, m22, m23, m24);
@@ -233,16 +232,16 @@ public struct Matrix : IEquatable<Matrix>, IFormattable
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private Matrix(Vector256<float> top, Vector256<float> bottom)
+    private Matrix4(Vector256<float> top, Vector256<float> bottom)
     {
         _top = top;
         _bottom = bottom;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public Matrix Invert()
+    public Matrix4 Invert()
     {
-        Matrix result = Matrix.Zero;
+        Matrix4 result = Matrix4.Zero;
 
         float n1, n2, n3, n4, n5, n6, n7, n8, n9, n10;
         float n11, n12, n13, n14, n15, n16, n17, n18, n19, n20;
@@ -305,14 +304,14 @@ public struct Matrix : IEquatable<Matrix>, IFormattable
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public Matrix Negate()
+    public Matrix4 Negate()
     {
-        Matrix result = Matrix.Zero;
+        Matrix4 result = Matrix4.Zero;
 
         if (MathUtilities.X86SimdSupported)
         {
             Vector256<float> mask = Vector256.Create(-0f);
-            result = new Matrix(Avx.Xor(_top, mask), Avx.Xor(_bottom, mask));
+            result = new Matrix4(Avx.Xor(_top, mask), Avx.Xor(_bottom, mask));
             return result;
         }
 
@@ -340,31 +339,27 @@ public struct Matrix : IEquatable<Matrix>, IFormattable
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public Matrix Transpose()
+    public Matrix4 Transpose()
     {
-        Matrix result = Matrix.Zero;
+        Matrix4 result = Matrix4.Zero;
 
         if (MathUtilities.X86SimdSupported)
         {
-            Vector128<float> row1, row2, row3, row4, tmp1, tmp2, tmp3, tmp4, col1, col2, col3, col4;
+            Vector256<float> r13, r24, v13, v24, c13, c24;
 
-            row1 = Vector128.Create(M11, M12, M13, M14);
-            row2 = Vector128.Create(M21, M22, M23, M24);
-            row3 = Vector128.Create(M31, M32, M33, M34);
-            row4 = Vector128.Create(M41, M42, M43, M44);
+            r13 = Avx.Permute2x128(_top, _bottom, 0x20);
+            r24 = Avx.Permute2x128(_top, _bottom, 0x31);
 
-            tmp1 = Sse.UnpackLow(row1, row2);
-            tmp2 = Sse.UnpackHigh(row1, row2);
-            tmp3 = Sse.UnpackLow(row3, row4);
-            tmp4 = Sse.UnpackHigh(row3, row4);
+            Vector256<float> t1, t2;
+            t1 = Avx.UnpackLow(r13, r24);
+            t2 = Avx.UnpackHigh(r13, r24);
+            v13 = Avx.Permute2x128(t1, t2, 0x20);
+            v24 = Avx.Permute2x128(t1, t2, 0x31);
 
-            col1 = Sse.MoveLowToHigh(tmp1, tmp3);
-            col2 = Sse.MoveHighToLow(tmp3, tmp1);
-            col3 = Sse.MoveLowToHigh(tmp2, tmp4);
-            col4 = Sse.MoveHighToLow(tmp4, tmp2);
+            c13 = Avx.Shuffle(v13, v24, 0x44);
+            c24 = Avx.Shuffle(v13, v24, 0xEE);
 
-            result = new Matrix(Vector256.Create(col1, col2), Vector256.Create(col3, col4));
-            return result;
+            return new Matrix4(Avx.Permute2x128(c13, c24, 0x20), Avx.Permute2x128(c13, c24, 0x31));
         }
 
         result.M11 = M11;
@@ -401,9 +396,9 @@ public struct Matrix : IEquatable<Matrix>, IFormattable
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Matrix FromRotationX(float radians)
+    public static Matrix4 FromRotationX(float radians)
     {
-        Matrix result = Matrix.Identity;
+        Matrix4 result = Matrix4.Identity;
 
         float val1 = radians.Cos();
         float val2 = radians.Sin();
@@ -417,9 +412,9 @@ public struct Matrix : IEquatable<Matrix>, IFormattable
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Matrix FromRotationY(float radians)
+    public static Matrix4 FromRotationY(float radians)
     {
-        Matrix result = Matrix.Identity;
+        Matrix4 result = Matrix4.Identity;
 
         float val1 = radians.Cos();
         float val2 = radians.Sin();
@@ -433,9 +428,9 @@ public struct Matrix : IEquatable<Matrix>, IFormattable
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Matrix FromRotationZ(float radians)
+    public static Matrix4 FromRotationZ(float radians)
     {
-        Matrix result = Matrix.Identity;
+        Matrix4 result = Matrix4.Identity;
 
         float val1 = radians.Cos();
         float val2 = radians.Sin();
@@ -449,9 +444,9 @@ public struct Matrix : IEquatable<Matrix>, IFormattable
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Matrix FromAxisAngle(Vector3 axis, float angle)
+    public static Matrix4 FromAxisAngle(Vector3 axis, float angle)
     {
-        Matrix result = Matrix.Zero;
+        Matrix4 result = Matrix4.Zero;
         float n1, n2, n3, n4, n5, n6, n7, n8;
 
         float x = axis.X;
@@ -485,9 +480,9 @@ public struct Matrix : IEquatable<Matrix>, IFormattable
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Matrix FromQuaternion(Quaternion quaternion)
+    public static Matrix4 FromQuaternion(Quaternion quaternion)
     {
-        Matrix result = Matrix.Zero;
+        Matrix4 result = Matrix4.Zero;
         float n1, n2, n3, n4, n5, n6, n7, n8, n9;
 
         n7 = quaternion.Z * quaternion.Z;
@@ -518,15 +513,15 @@ public struct Matrix : IEquatable<Matrix>, IFormattable
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Matrix FromYawPitchRoll(float yaw, float pitch, float roll)
+    public static Matrix4 FromYawPitchRoll(float yaw, float pitch, float roll)
     {
         return FromQuaternion(Quaternion.FromYawPitchRoll(yaw, pitch, roll));
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Matrix FromTranslation(Vector3 translate)
+    public static Matrix4 FromTranslation(Vector3 translate)
     {
-        Matrix result = Matrix.Zero;
+        Matrix4 result = Matrix4.Zero;
         result.M11 = 1f;
         result.M22 = 1f;
         result.M33 = 1f;
@@ -538,9 +533,9 @@ public struct Matrix : IEquatable<Matrix>, IFormattable
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Matrix FromScale(Vector3 scale)
+    public static Matrix4 FromScale(Vector3 scale)
     {
-        Matrix result = Matrix.Zero;
+        Matrix4 result = Matrix4.Zero;
         result.M11 = scale.X;
         result.M22 = scale.Y;
         result.M33 = scale.Z;
@@ -549,9 +544,9 @@ public struct Matrix : IEquatable<Matrix>, IFormattable
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Matrix FromLookAt(Vector3 position, Vector3 target, Vector3 up)
+    public static Matrix4 FromLookAt(Vector3 position, Vector3 target, Vector3 up)
     {
-        Matrix result = Matrix.Zero;
+        Matrix4 result = Matrix4.Zero;
 
         Vector3 vecA = (position - target).Normalize();
         Vector3 vecB = (up.CrossProduct(vecA)).Normalize();
@@ -574,9 +569,9 @@ public struct Matrix : IEquatable<Matrix>, IFormattable
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Matrix FromOrthographic(float left, float right, float bottom, float top, float near, float far)
+    public static Matrix4 FromOrthographic(float left, float right, float bottom, float top, float near, float far)
     {
-        Matrix result = Matrix.Zero;
+        Matrix4 result = Matrix4.Zero;
 
         result.M11 = (float)(2.0 / (right - left));
         result.M22 = (float)(2.0 / (top - bottom));
@@ -590,9 +585,9 @@ public struct Matrix : IEquatable<Matrix>, IFormattable
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Matrix FromPerspective(float left, float right, float top, float bottom, float near, float far)
+    public static Matrix4 FromPerspective(float left, float right, float top, float bottom, float near, float far)
     {
-        Matrix result = Matrix.Zero;
+        Matrix4 result = Matrix4.Zero;
 
         if (near <= 0f || far <= 0f)
         {
@@ -616,9 +611,9 @@ public struct Matrix : IEquatable<Matrix>, IFormattable
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Matrix FromPerspectiveFov(float fovy, float ratio, float near, float far)
+    public static Matrix4 FromPerspectiveFov(float fovy, float ratio, float near, float far)
     {
-        Matrix result = Matrix.Zero;
+        Matrix4 result = Matrix4.Zero;
 
         if (near <= 0f || far <= 0f)
         {
@@ -713,7 +708,7 @@ public struct Matrix : IEquatable<Matrix>, IFormattable
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public readonly bool Equals(Matrix other)
+    public readonly bool Equals(Matrix4 other)
     {
         if (MathUtilities.X86SimdSupported)
         {
@@ -732,32 +727,32 @@ public struct Matrix : IEquatable<Matrix>, IFormattable
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public override bool Equals(object? obj)
     {
-        if (obj != null && obj is Matrix)
+        if (obj != null && obj is Matrix4)
         {
-            return Equals((Matrix)obj);
+            return Equals((Matrix4)obj);
         }
 
         return false;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Matrix Add(Matrix mat, float val)
+    public static Matrix4 Add(Matrix4 mat, float val)
     {
-        return Add(mat, new Matrix(val));
+        return Add(mat, new Matrix4(val));
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Matrix Add(Matrix left, Matrix right)
+    public static Matrix4 Add(Matrix4 left, Matrix4 right)
     {
         if (MathUtilities.X86SimdSupported)
         {
             Vector256<float> top, bottom;
             top = Avx.Add(left._top, right._top);
             bottom = Avx.Add(left._bottom, right._bottom);
-            return new Matrix(top, bottom);
+            return new Matrix4(top, bottom);
         }
 
-        return new Matrix(left.M11 + right.M11,
+        return new Matrix4(left.M11 + right.M11,
             left.M12 + right.M12,
             left.M13 + right.M13,
             left.M14 + right.M14,
@@ -776,87 +771,35 @@ public struct Matrix : IEquatable<Matrix>, IFormattable
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Matrix Subtract(Matrix mat, float val)
+    public static Matrix4 Multiply(Matrix4 mat, float val)
     {
-        return Subtract(mat, new Matrix(val));
+        return Multiply(mat, new Matrix4(val));
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Matrix Subtract(Matrix left, Matrix right)
+    public static Matrix4 Multiply(Matrix4 left, Matrix4 right)
     {
-        if (MathUtilities.X86SimdSupported)
-        {
-            Vector256<float> top, bottom;
-            top = Avx.Subtract(left._top, right._top);
-            bottom = Avx.Subtract(left._bottom, right._bottom);
-            return new Matrix(top, bottom);
-        }
-
-        return new Matrix(left.M11 - right.M11,
-            left.M12 - right.M12,
-            left.M13 - right.M13,
-            left.M14 - right.M14,
-            left.M21 - right.M21,
-            left.M22 - right.M22,
-            left.M23 - right.M23,
-            left.M24 - right.M24,
-            left.M31 - right.M31,
-            left.M32 - right.M32,
-            left.M33 - right.M33,
-            left.M34 - right.M34,
-            left.M41 - right.M41,
-            left.M42 - right.M42,
-            left.M43 - right.M43,
-            left.M44 - right.M44);
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Matrix Multiply(Matrix mat, float val)
-    {
-        return Multiply(mat, new Matrix(val));
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Matrix Multiply(Matrix left, Matrix right)
-    {
-        Matrix result = Matrix.Zero;
+        Matrix4 result = Matrix4.Zero;
 
         if (MathUtilities.X86SimdSupported)
         {
-            // Could probably be faster with AVX, but it's easier to use to operate
-            // on individual rows or columns with SSE
+            Vector256<float> r1, r2, r3, r4;
+            r1 = Avx.Permute2x128(right._top, right._top, 0x00);
+            r2 = Avx.Permute2x128(right._top, right._top, 0x11);
+            r3 = Avx.Permute2x128(right._bottom, right._bottom, 0x00);
+            r4 = Avx.Permute2x128(right._bottom, right._bottom, 0x11);
 
-            Vector128<float> rrow1 = right._top.GetLower();
-            Vector128<float> rrow2 = right._top.GetUpper();
-            Vector128<float> rrow3 = right._bottom.GetLower();
-            Vector128<float> rrow4 = right._bottom.GetUpper();
+            Vector256<float> top = Avx.Multiply(Avx.Shuffle(left._top, left._top, 0x00), r1);
+            top = Avx.Add(top, Avx.Multiply(Avx.Shuffle(left._top, left._top, 0x55), r2));
+            top = Avx.Add(top, Avx.Multiply(Avx.Shuffle(left._top, left._top, 0xAA), r3));
+            top = Avx.Add(top, Avx.Multiply(Avx.Shuffle(left._top, left._top, 0xFF), r4));
 
-            Vector128<float> lrow1 = left._top.GetLower();
-            Vector128<float> lrow2 = left._top.GetUpper();
-            Vector128<float> lrow3 = left._bottom.GetLower();
-            Vector128<float> lrow4 = left._bottom.GetUpper();
+            Vector256<float> bottom = Avx.Multiply(Avx.Shuffle(left._bottom, left._bottom, 0x00), r1);
+            bottom = Avx.Add(bottom, Avx.Multiply(Avx.Shuffle(left._bottom, left._bottom, 0x55), r2));
+            bottom = Avx.Add(bottom, Avx.Multiply(Avx.Shuffle(left._bottom, left._bottom, 0xAA), r3));
+            bottom = Avx.Add(bottom, Avx.Multiply(Avx.Shuffle(left._bottom, left._bottom, 0xFF), r4));
 
-            Vector128<float> r1 = Sse.Multiply(Sse.Shuffle(lrow1, lrow1, 0x00), rrow1);
-            r1 = Sse.Add(r1, Sse.Multiply(Sse.Shuffle(lrow1, lrow1, 0x55), rrow2));
-            r1 = Sse.Add(r1, Sse.Multiply(Sse.Shuffle(lrow1, lrow1, 0xAA), rrow3));
-            r1 = Sse.Add(r1, Sse.Multiply(Sse.Shuffle(lrow1, lrow1, 0xFF), rrow4));
-
-            Vector128<float> r2 = Sse.Multiply(Sse.Shuffle(lrow2, lrow2, 0x00), rrow1);
-            r2 = Sse.Add(r2, Sse.Multiply(Sse.Shuffle(lrow2, lrow2, 0x55), rrow2));
-            r2 = Sse.Add(r2, Sse.Multiply(Sse.Shuffle(lrow2, lrow2, 0xAA), rrow3));
-            r2 = Sse.Add(r2, Sse.Multiply(Sse.Shuffle(lrow2, lrow2, 0xFF), rrow4));
-
-            Vector128<float> r3 = Sse.Multiply(Sse.Shuffle(lrow3, lrow3, 0x00), rrow1);
-            r3 = Sse.Add(r3, Sse.Multiply(Sse.Shuffle(lrow3, lrow3, 0x55), rrow2));
-            r3 = Sse.Add(r3, Sse.Multiply(Sse.Shuffle(lrow3, lrow3, 0xAA), rrow3));
-            r3 = Sse.Add(r3, Sse.Multiply(Sse.Shuffle(lrow3, lrow3, 0xFF), rrow4));
-
-            Vector128<float> r4 = Sse.Multiply(Sse.Shuffle(lrow4, lrow4, 0x00), rrow1);
-            r4 = Sse.Add(r4, Sse.Multiply(Sse.Shuffle(lrow4, lrow4, 0x55), rrow2));
-            r4 = Sse.Add(r4, Sse.Multiply(Sse.Shuffle(lrow4, lrow4, 0xAA), rrow3));
-            r4 = Sse.Add(r4, Sse.Multiply(Sse.Shuffle(lrow4, lrow4, 0xFF), rrow4));
-
-            result = new Matrix(Vector256.Create(r1, r2), Vector256.Create(r3, r4));
+            result = new Matrix4(top, bottom);
             return result;
         }
         
@@ -884,96 +827,37 @@ public struct Matrix : IEquatable<Matrix>, IFormattable
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Matrix Divide(Matrix mat, float val)
-    {
-        return Divide(mat, new Matrix(val));
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Matrix Divide(Matrix left, Matrix right)
-    {
-        if (MathUtilities.X86SimdSupported)
-        {
-            Vector256<float> top, bottom;
-            top = Avx.Divide(left._top, right._top);
-            bottom = Avx.Divide(left._bottom, right._bottom);
-            return new Matrix(top, bottom);
-        }
-
-        return new Matrix(left.M11 / right.M11,
-            left.M12 / right.M12,
-            left.M13 / right.M13,
-            left.M14 / right.M14,
-            left.M21 / right.M21,
-            left.M22 / right.M22,
-            left.M23 / right.M23,
-            left.M24 / right.M24,
-            left.M31 / right.M31,
-            left.M32 / right.M32,
-            left.M33 / right.M33,
-            left.M34 / right.M34,
-            left.M41 / right.M41,
-            left.M42 / right.M42,
-            left.M43 / right.M43,
-            left.M44 / right.M44);
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Matrix operator +(Matrix mat, float val)
+    public static Matrix4 operator +(Matrix4 mat, float val)
     {
         return Add(mat, val);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Matrix operator +(Matrix left, Matrix right)
+    public static Matrix4 operator +(Matrix4 left, Matrix4 right)
     {
         return Add(left, right);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Matrix operator -(Matrix mat, float val)
-    {
-        return Subtract(mat, val);
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Matrix operator -(Matrix left, Matrix right)
-    {
-        return Subtract(left, right);
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Matrix operator *(Matrix mat, float val)
+    public static Matrix4 operator *(Matrix4 mat, float val)
     {
         return Multiply(mat, val);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Matrix operator *(Matrix left, Matrix right)
+    public static Matrix4 operator *(Matrix4 left, Matrix4 right)
     {
         return Multiply(left, right);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Matrix operator /(Matrix mat, float val)
-    {
-        return Divide(mat, val);
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Matrix operator /(Matrix left, Matrix right)
-    {
-        return Divide(left, right);
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static bool operator ==(Matrix left, Matrix right)
+    public static bool operator ==(Matrix4 left, Matrix4 right)
     {
         return left.Equals(right);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static bool operator !=(Matrix left, Matrix right)
+    public static bool operator !=(Matrix4 left, Matrix4 right)
     {
         return !left.Equals(right);
     }

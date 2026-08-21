@@ -128,7 +128,7 @@ public class ShaderParameter
 
         buffer.WriteArray<float>(offset, values);
     }
-    public void SetValue(Matrix value)
+    public void SetValue(Matrix4 value)
     {
         if (Kind != ShaderParameterKind.BufferMember)
         {
@@ -181,7 +181,7 @@ public class ShaderParameter
         buffer.WriteArray<float>(offset, data);
     }
 
-    public void SetValue(ReadOnlySpan<Matrix> values)
+    public void SetValue(ReadOnlySpan<Matrix4> values)
     {
         if (Kind != ShaderParameterKind.BufferMember)
         {
@@ -195,7 +195,7 @@ public class ShaderParameter
 
         for (int i = 0; i < count; i++)
         {
-            Matrix value = values[i];
+            Matrix4 value = values[i];
             int j = i * 16;
 
             data[j + 0] = value.M11;

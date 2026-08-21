@@ -39,8 +39,8 @@ public class TestGame : Game
 
     SpriteBatch spriteBatch;
 
-    Matrix projection;
-    Matrix view;
+    Matrix4 projection;
+    Matrix4 view;
     Vector3 forward;
     double elapsed;
 
@@ -92,7 +92,7 @@ public class TestGame : Game
     void UpdateProjection()
     {
         float aspect = Window.Resolution.W / (float)Window.Resolution.H;
-        projection = Matrix.CreatePerspectiveFieldOfView(
+        projection = Matrix4.CreatePerspectiveFieldOfView(
             MathHelper.ToRadians(70f), aspect, 0.1f, 100f);
     }
     void BuildCube()
@@ -212,7 +212,7 @@ public class TestGame : Game
         if (InputManager.IsInputHeld(Input.KeyA)) cameraPosition -= right * move;
         if (InputManager.IsInputHeld(Input.KeyD)) cameraPosition += right * move;
 
-        view = Matrix.CreateLookAt(cameraPosition, cameraPosition + forward, Vector3.Up);
+        view = Matrix4.CreateLookAt(cameraPosition, cameraPosition + forward, Vector3.Up);
     }
 
     protected override void OnDrawFrame(double delta)
@@ -230,7 +230,7 @@ public class TestGame : Game
         cubeShader.Parameters["Time"]?.SetValue((float)elapsed);
         cubeShader.Parameters["ScreenSize"]?.SetValue(new Vector2(Window.Resolution.W, Window.Resolution.H));
 
-        Matrix world = Matrix.CreateRotationY((float)elapsed * 0.5f);
+        Matrix4 world = Matrix4.CreateRotationY((float)elapsed * 0.5f);
         cubeShader.Parameters["World"]?.SetValue(world);
 
         // One warm point light orbiting the cube.
@@ -253,7 +253,7 @@ public class TestGame : Game
 
         screenTexture.End();
 
-        spriteBatch.Begin(Matrix.CreateOrthographicOffCenter(0, Window.Resolution.W, Window.Resolution.H, 0, 0, 1));
+        spriteBatch.Begin(Matrix4.CreateOrthographicOffCenter(0, Window.Resolution.W, Window.Resolution.H, 0, 0, 1));
 
         spriteBatch.Draw(screenTexture, Vector2.Zero, new(Window.Resolution.W, Window.Resolution.H), Color.White);
         //spriteBatch.Draw(skiaSurface.Texture, Vector2.Zero, new(Window.Resolution.W, Window.Resolution.H), Color.White);

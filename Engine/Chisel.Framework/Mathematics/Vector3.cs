@@ -159,7 +159,7 @@ public struct Vector3 : IEquatable<Vector3>, IFormattable
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public Vector3 TransformByMatrix(Matrix mat)
+    public Vector3 TransformByMatrix(Matrix4 mat)
     {
         // TODO: Some SIMD optimizations if possible?
         if (MathUtilities.X86SimdSupported)

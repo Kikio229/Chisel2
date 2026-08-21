@@ -216,7 +216,7 @@ public struct Quaternion : IEquatable<Quaternion>, IFormattable
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Quaternion FromRotationMatrix(Matrix matrix)
+    public static Quaternion FromRotationMatrix(Matrix4 matrix)
     {
         float sqrt, half;
         Quaternion result = Quaternion.Zero;
