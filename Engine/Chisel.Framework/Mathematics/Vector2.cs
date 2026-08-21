@@ -51,7 +51,7 @@ public struct Vector2 : IEquatable<Vector2>, IFormattable
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public float Length()
     {
-        if (Sse41.IsSupported)
+        if (MathUtilities.X86SimdSupported)
         {
             Vector128<float> len = Sse.Sqrt(Sse41.DotProduct(_value, _value, 0xFF));
             return Vector128.ToScalar(len);
@@ -63,7 +63,7 @@ public struct Vector2 : IEquatable<Vector2>, IFormattable
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public float LengthSquared()
     {
-        if (Sse41.IsSupported)
+        if (MathUtilities.X86SimdSupported)
         {
             Vector128<float> len = Sse41.DotProduct(_value, _value, 0xFF);
             return Vector128.ToScalar(len);
@@ -75,7 +75,7 @@ public struct Vector2 : IEquatable<Vector2>, IFormattable
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public float Distance(Vector2 vec)
     {
-        if (Sse41.IsSupported)
+        if (MathUtilities.X86SimdSupported)
         {
             Vector128<float> diff, dist;
             diff = Sse.Subtract(_value, vec._value);
@@ -89,7 +89,7 @@ public struct Vector2 : IEquatable<Vector2>, IFormattable
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public float DistanceSquared(Vector2 vec)
     {
-        if (Sse41.IsSupported)
+        if (MathUtilities.X86SimdSupported)
         {
             Vector128<float> diff, dist;
             diff = Sse.Subtract(_value, vec._value);
@@ -103,7 +103,7 @@ public struct Vector2 : IEquatable<Vector2>, IFormattable
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public float DotProduct(Vector2 vec)
     {
-        if (Sse41.IsSupported)
+        if (MathUtilities.X86SimdSupported)
         {
             Vector128<float> dot = Sse41.DotProduct(_value, vec._value, 0xFF);
             return Vector128.ToScalar(dot);
@@ -115,7 +115,7 @@ public struct Vector2 : IEquatable<Vector2>, IFormattable
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Vector2 Negate()
     {
-        if (Sse.IsSupported)
+        if (MathUtilities.X86SimdSupported)
         {
             Vector128<float> mask = Vector128.Create(-0f);
             return new Vector2(Sse.Xor(_value, mask));
@@ -127,12 +127,24 @@ public struct Vector2 : IEquatable<Vector2>, IFormattable
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Vector2 TransformByMatrix(Matrix mat)
     {
+        // TODO: Some SIMD optimizations if possible?
+        if (MathUtilities.X86SimdSupported)
+        {
+
+        }
+
         return new Vector2((X * mat.M11) + (Y * mat.M21) + mat.M41, (X * mat.M12) + (Y * mat.M22) + mat.M42);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Vector2 TransformByQuaternion(Quaternion quat)
     {
+        // TODO: Some SIMD optimizations if possible?
+        if (MathUtilities.X86SimdSupported)
+        {
+
+        }
+
         Vector3 rot1 = new Vector3(quat.X + quat.X, quat.Y + quat.Y, quat.Z + quat.Z);
         Vector3 rot2 = new Vector3(quat.X, quat.X, quat.W);
         Vector3 rot3 = new Vector3(1f, quat.Y, quat.Z);
@@ -147,7 +159,7 @@ public struct Vector2 : IEquatable<Vector2>, IFormattable
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Vector2 Min(Vector2 vec)
     {
-        if (Sse.IsSupported)
+        if (MathUtilities.X86SimdSupported)
         {
             return new Vector2(Sse.Min(_value, vec._value));
         }
@@ -158,7 +170,7 @@ public struct Vector2 : IEquatable<Vector2>, IFormattable
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Vector2 Max(Vector2 vec)
     {
-        if (Sse.IsSupported)
+        if (MathUtilities.X86SimdSupported)
         {
             return new Vector2(Sse.Max(_value, vec._value));
         }
@@ -169,7 +181,7 @@ public struct Vector2 : IEquatable<Vector2>, IFormattable
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Vector2 Normalize()
     {
-        if (Sse41.IsSupported)
+        if (MathUtilities.X86SimdSupported)
         {
             Vector128<float> dot, ilen, half, threehalfs, ilenSqr;
             dot = Sse41.DotProduct(_value, _value, 0xFF);
@@ -191,7 +203,7 @@ public struct Vector2 : IEquatable<Vector2>, IFormattable
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Vector2 Lerp(Vector2 vec, float amount)
     {
-        if (Sse.IsSupported)
+        if (MathUtilities.X86SimdSupported)
         {
             Vector128<float> tvec, diff;
             tvec = Vector128.Create(amount);
@@ -249,7 +261,7 @@ public struct Vector2 : IEquatable<Vector2>, IFormattable
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public readonly bool Equals(Vector2 other)
     {
-        if (Sse.IsSupported)
+        if (MathUtilities.X86SimdSupported)
         {
             Vector128<float> equal = Sse.CompareEqual(_value, other._value);
             return Sse.MoveMask(equal) == 0xFF;
@@ -278,7 +290,7 @@ public struct Vector2 : IEquatable<Vector2>, IFormattable
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Vector2 Add(Vector2 left, Vector2 right)
     {
-        if (Sse.IsSupported)
+        if (MathUtilities.X86SimdSupported)
         {
             return new Vector2(Sse.Add(left._value, right._value));
         }
@@ -295,7 +307,7 @@ public struct Vector2 : IEquatable<Vector2>, IFormattable
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Vector2 Subtract(Vector2 left, Vector2 right)
     {
-        if (Sse.IsSupported)
+        if (MathUtilities.X86SimdSupported)
         {
             return new Vector2(Sse.Subtract(left._value, right._value));
         }
@@ -312,7 +324,7 @@ public struct Vector2 : IEquatable<Vector2>, IFormattable
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Vector2 Multiply(Vector2 left, Vector2 right)
     {
-        if (Sse.IsSupported)
+        if (MathUtilities.X86SimdSupported)
         {
             return new Vector2(Sse.Multiply(left._value, right._value));
         }
@@ -329,7 +341,7 @@ public struct Vector2 : IEquatable<Vector2>, IFormattable
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Vector2 Divide(Vector2 left, Vector2 right)
     {
-        if (Sse.IsSupported)
+        if (MathUtilities.X86SimdSupported)
         {
             return new Vector2(Sse.Divide(left._value, right._value));
         }

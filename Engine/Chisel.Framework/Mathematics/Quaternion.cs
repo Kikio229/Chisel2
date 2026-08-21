@@ -64,7 +64,7 @@ public struct Quaternion : IEquatable<Quaternion>, IFormattable
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public float Length()
     {
-        if (Sse41.IsSupported)
+        if (MathUtilities.X86SimdSupported)
         {
             Vector128<float> len = Sse.Sqrt(Sse41.DotProduct(_value, _value, 0xFF));
             return Vector128.ToScalar(len);
@@ -76,7 +76,7 @@ public struct Quaternion : IEquatable<Quaternion>, IFormattable
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public float LengthSquared()
     {
-        if (Sse41.IsSupported)
+        if (MathUtilities.X86SimdSupported)
         {
             Vector128<float> len = Sse41.DotProduct(_value, _value, 0xFF);
             return Vector128.ToScalar(len);
@@ -88,7 +88,7 @@ public struct Quaternion : IEquatable<Quaternion>, IFormattable
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public float DotProduct(Quaternion quat)
     {
-        if (Sse41.IsSupported)
+        if (MathUtilities.X86SimdSupported)
         {
             Vector128<float> dot = Sse41.DotProduct(_value, quat._value, 0xFF);
             return Vector128.ToScalar(dot);
@@ -100,7 +100,7 @@ public struct Quaternion : IEquatable<Quaternion>, IFormattable
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Quaternion Normalize()
     {
-        if (Sse41.IsSupported)
+        if (MathUtilities.X86SimdSupported)
         {
             Vector128<float> dot, ilen, half, threehalfs, ilenSqr;
             dot = Sse41.DotProduct(_value, _value, 0xFF);
@@ -122,7 +122,7 @@ public struct Quaternion : IEquatable<Quaternion>, IFormattable
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Quaternion Lerp(Quaternion quat, float amount)
     {
-        if (Sse.IsSupported)
+        if (MathUtilities.X86SimdSupported)
         {
             Vector128<float> tvec, diff;
             tvec = Vector128.Create(amount);
@@ -143,7 +143,7 @@ public struct Quaternion : IEquatable<Quaternion>, IFormattable
         float dot;
         const float epsilon = 0.000001f;
 
-        if (Sse.IsSupported)
+        if (MathUtilities.X86SimdSupported)
         {
             Vector128<float> prod = Sse.Multiply(_value, quat._value);
             dot = prod.GetElement(0) + prod.GetElement(1) + prod.GetElement(2) + prod.GetElement(3);
@@ -185,7 +185,7 @@ public struct Quaternion : IEquatable<Quaternion>, IFormattable
         float ratioA = ((1.0f - amount) * theta).Sin() / sinTheta;
         float ratioB = (amount * theta).Sin() / sinTheta;
 
-        if (Sse.IsSupported)
+        if (MathUtilities.X86SimdSupported)
         {
             Vector128<float> ratioAVec, ratioBVec;
             ratioAVec = Vector128.Create(ratioA);
@@ -338,7 +338,7 @@ public struct Quaternion : IEquatable<Quaternion>, IFormattable
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public readonly bool Equals(Quaternion other)
     {
-        if (Sse.IsSupported)
+        if (MathUtilities.X86SimdSupported)
         {
             Vector128<float> equal = Sse.CompareEqual(_value, other._value);
             return Sse.MoveMask(equal) == 0xF;
@@ -361,7 +361,7 @@ public struct Quaternion : IEquatable<Quaternion>, IFormattable
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Quaternion Add(Quaternion left, Quaternion right)
     {
-        if (Sse.IsSupported)
+        if (MathUtilities.X86SimdSupported)
         {
             return new Quaternion(Sse.Add(left._value, right._value));
         }
@@ -372,7 +372,7 @@ public struct Quaternion : IEquatable<Quaternion>, IFormattable
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Quaternion Subtract(Quaternion left, Quaternion right)
     {
-        if (Sse.IsSupported)
+        if (MathUtilities.X86SimdSupported)
         {
             return new Quaternion(Sse.Subtract(left._value, right._value));
         }
@@ -383,7 +383,12 @@ public struct Quaternion : IEquatable<Quaternion>, IFormattable
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Quaternion Multiply(Quaternion left, Quaternion right)
     {
-        // TODO: SIMD optimizations?
+        // TODO: Some SIMD optimizations if possible?
+        if (MathUtilities.X86SimdSupported)
+        {
+
+        }
+
         return new Quaternion(
             (left.X * right.W) + (left.W * right.X) + (left.Y * right.Z) - (left.Z * right.Y),
             (left.Y * right.W) + (left.W * right.Y) + (left.Z * right.X) - (left.X * right.Z),
@@ -394,7 +399,12 @@ public struct Quaternion : IEquatable<Quaternion>, IFormattable
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Quaternion Divide(Quaternion left, Quaternion right)
     {
-        // TODO: SIMD optimizations?
+        // TODO: Some SIMD optimizations if possible?
+        if (MathUtilities.X86SimdSupported)
+        {
+
+        }
+
         float normSqr = (right.W * right.W) + (right.X * right.X) + (right.Y * right.Y) + (right.Z * right.Z);
         return new Quaternion(
             (left.X * right.W - left.W * right.X - left.Y * right.Z + left.Z * right.Y) * (1.0f / normSqr),

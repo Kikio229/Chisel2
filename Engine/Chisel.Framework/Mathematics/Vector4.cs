@@ -71,7 +71,7 @@ public struct Vector4 : IEquatable<Vector4>, IFormattable
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public float Length()
     {
-        if (Sse41.IsSupported)
+        if (MathUtilities.X86SimdSupported)
         {
             Vector128<float> len = Sse.Sqrt(Sse41.DotProduct(_value, _value, 0xFF));
             return Vector128.ToScalar(len);
@@ -83,7 +83,7 @@ public struct Vector4 : IEquatable<Vector4>, IFormattable
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public float LengthSquared()
     {
-        if (Sse41.IsSupported)
+        if (MathUtilities.X86SimdSupported)
         {
             Vector128<float> len = Sse41.DotProduct(_value, _value, 0xFF);
             return Vector128.ToScalar(len);
@@ -95,7 +95,7 @@ public struct Vector4 : IEquatable<Vector4>, IFormattable
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public float Distance(Vector4 vec)
     {
-        if (Sse41.IsSupported)
+        if (MathUtilities.X86SimdSupported)
         {
             Vector128<float> diff, dist;
             diff = Sse.Subtract(_value, vec._value);
@@ -109,7 +109,7 @@ public struct Vector4 : IEquatable<Vector4>, IFormattable
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public float DistanceSquared(Vector4 vec)
     {
-        if (Sse41.IsSupported)
+        if (MathUtilities.X86SimdSupported)
         {
             Vector128<float> diff, dist;
             diff = Sse.Subtract(_value, vec._value);
@@ -123,7 +123,7 @@ public struct Vector4 : IEquatable<Vector4>, IFormattable
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public float DotProduct(Vector4 vec)
     {
-        if (Sse41.IsSupported)
+        if (MathUtilities.X86SimdSupported)
         {
             Vector128<float> dot = Sse41.DotProduct(_value, vec._value, 0xFF);
             return Vector128.ToScalar(dot);
@@ -135,7 +135,7 @@ public struct Vector4 : IEquatable<Vector4>, IFormattable
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Vector4 Negate()
     {
-        if (Sse.IsSupported)
+        if (MathUtilities.X86SimdSupported)
         {
             Vector128<float> mask = Vector128.Create(-0f);
             return new Vector4(Sse.Xor(_value, mask));
@@ -147,6 +147,12 @@ public struct Vector4 : IEquatable<Vector4>, IFormattable
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Vector4 TransformByMatrix(Matrix mat)
     {
+        // TODO: Some SIMD optimizations if possible?
+        if (MathUtilities.X86SimdSupported)
+        {
+
+        }
+
         float x = (X * mat.M11) + (Y * mat.M21) + (Z * mat.M31) + (W * mat.M41);
         float y = (X * mat.M12) + (Y * mat.M22) + (Z * mat.M32) + (W * mat.M42);
         float z = (X * mat.M13) + (Y * mat.M23) + (Z * mat.M33) + (W * mat.M43);
@@ -157,7 +163,7 @@ public struct Vector4 : IEquatable<Vector4>, IFormattable
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Vector4 Min(Vector4 vec)
     {
-        if (Sse.IsSupported)
+        if (MathUtilities.X86SimdSupported)
         {
             return new Vector4(Sse.Min(_value, vec._value));
         }
@@ -168,7 +174,7 @@ public struct Vector4 : IEquatable<Vector4>, IFormattable
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Vector4 Max(Vector4 vec)
     {
-        if (Sse.IsSupported)
+        if (MathUtilities.X86SimdSupported)
         {
             return new Vector4(Sse.Max(_value, vec._value));
         }
@@ -179,7 +185,7 @@ public struct Vector4 : IEquatable<Vector4>, IFormattable
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Vector4 Normalize()
     {
-        if (Sse41.IsSupported)
+        if (MathUtilities.X86SimdSupported)
         {
             Vector128<float> dot, ilen, half, threehalfs, ilenSqr;
             dot = Sse41.DotProduct(_value, _value, 0xFF);
@@ -201,7 +207,7 @@ public struct Vector4 : IEquatable<Vector4>, IFormattable
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Vector4 Lerp(Vector4 vec, float amount)
     {
-        if (Sse.IsSupported)
+        if (MathUtilities.X86SimdSupported)
         {
             Vector128<float> tvec, diff;
             tvec = Vector128.Create(amount);
@@ -265,7 +271,7 @@ public struct Vector4 : IEquatable<Vector4>, IFormattable
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public readonly bool Equals(Vector4 other)
     {
-        if (Sse.IsSupported)
+        if (MathUtilities.X86SimdSupported)
         {
             Vector128<float> equal = Sse.CompareEqual(_value, other._value);
             return Sse.MoveMask(equal) == 0xFF;
@@ -294,7 +300,7 @@ public struct Vector4 : IEquatable<Vector4>, IFormattable
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Vector4 Add(Vector4 left, Vector4 right)
     {
-        if (Sse.IsSupported)
+        if (MathUtilities.X86SimdSupported)
         {
             return new Vector4(Sse.Add(left._value, right._value));
         }
@@ -311,7 +317,7 @@ public struct Vector4 : IEquatable<Vector4>, IFormattable
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Vector4 Subtract(Vector4 left, Vector4 right)
     {
-        if (Sse.IsSupported)
+        if (MathUtilities.X86SimdSupported)
         {
             return new Vector4(Sse.Subtract(left._value, right._value));
         }
@@ -328,7 +334,7 @@ public struct Vector4 : IEquatable<Vector4>, IFormattable
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Vector4 Multiply(Vector4 left, Vector4 right)
     {
-        if (Sse.IsSupported)
+        if (MathUtilities.X86SimdSupported)
         {
             return new Vector4(Sse.Multiply(left._value, right._value));
         }
@@ -345,7 +351,7 @@ public struct Vector4 : IEquatable<Vector4>, IFormattable
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Vector4 Divide(Vector4 left, Vector4 right)
     {
-        if (Sse.IsSupported)
+        if (MathUtilities.X86SimdSupported)
         {
             return new Vector4(Sse.Divide(left._value, right._value));
         }
