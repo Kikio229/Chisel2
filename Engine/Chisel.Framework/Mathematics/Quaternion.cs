@@ -368,23 +368,34 @@ public struct Quaternion : IEquatable<Quaternion>, IFormattable
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Quaternion Subtract(Quaternion left, Quaternion right)
-    {
-        if (MathUtilities.X86SimdSupported)
-        {
-            return new Quaternion(Sse.Subtract(left._value, right._value));
-        }
-
-        return new Quaternion(left.X - right.X, left.Y - right.Y, left.Z - right.Z, left.W - right.W);
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Quaternion Multiply(Quaternion left, Quaternion right)
     {
-        // TODO: Some SIMD optimizations if possible?
         if (MathUtilities.X86SimdSupported)
         {
+            Vector128<float> lq, rq, lw, rw;
 
+            lq = left._value;
+            rq = right._value;
+            lw = Sse.Shuffle(lq, lq, 0xFF);
+            rw = Sse.Shuffle(rq, rq, 0xFF);
+
+            Vector128<float> quat, cross, prod, dot;
+
+            quat = Sse.Add(Sse.Multiply(lq, rw), Sse.Multiply(lw, rq));
+            cross = Sse.Subtract(
+                Sse.Multiply(Sse.Shuffle(lq, lq, 0xC9), Sse.Shuffle(rq, rq, 0xD2)),
+                Sse.Multiply(Sse.Shuffle(lq, lq, 0xD2), Sse.Shuffle(rq, rq, 0xC9)));
+
+            quat = Sse.Add(quat, cross);
+            prod = Sse.Multiply(lq, rq);
+
+            dot = Sse.Add(prod, Sse.Shuffle(prod, prod, 0x4E));
+            dot = Sse.Add(dot, Sse.Shuffle(prod, prod, 0x55));
+            dot = Sse.Shuffle(dot, dot, 0x00);
+
+            quat = Sse41.Blend(quat, Sse.Subtract(Sse.Multiply(lw, rw), dot), 0b1000);
+
+            return new Quaternion(quat);
         }
 
         return new Quaternion(
@@ -395,44 +406,15 @@ public struct Quaternion : IEquatable<Quaternion>, IFormattable
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Quaternion Divide(Quaternion left, Quaternion right)
-    {
-        // TODO: Some SIMD optimizations if possible?
-        if (MathUtilities.X86SimdSupported)
-        {
-
-        }
-
-        float normSqr = (right.W * right.W) + (right.X * right.X) + (right.Y * right.Y) + (right.Z * right.Z);
-        return new Quaternion(
-            (left.X * right.W - left.W * right.X - left.Y * right.Z + left.Z * right.Y) * (1.0f / normSqr),
-            (left.Y * right.W - left.W * right.Y - left.Z * right.X + left.X * right.Z) * (1.0f / normSqr),
-            (left.Z * right.W - left.W * right.Z - left.X * right.Y + left.Y * right.X) * (1.0f / normSqr),
-            (left.W * right.W + left.X * right.X + left.Y * right.Y + left.Z * right.Z) * (1.0f / normSqr));
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Quaternion operator +(Quaternion left, Quaternion right)
     {
         return Add(left, right);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Quaternion operator -(Quaternion left, Quaternion right)
-    {
-        return Subtract(left, right);
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Quaternion operator *(Quaternion left, Quaternion right)
     {
         return Multiply(left, right);
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Quaternion operator /(Quaternion left, Quaternion right)
-    {
-        return Divide(left, right);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

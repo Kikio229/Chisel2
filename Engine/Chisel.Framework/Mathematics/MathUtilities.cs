@@ -31,7 +31,7 @@ public static class MathUtilities
 
     // AVX requires a x86 CPU from at least 2011...
     // So as long as you're not using like a 1st gen i7 you this should be supported
-    internal static bool X86SimdSupported = Avx.IsSupported; 
+    internal static bool X86SimdSupported = Avx.IsSupported;
     internal static bool ArmSimdSupported = false; // Maybe...
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
