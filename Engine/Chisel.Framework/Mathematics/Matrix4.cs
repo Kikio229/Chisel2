@@ -246,7 +246,7 @@ public struct Matrix4 : IEquatable<Matrix4>, IFormattable
         float n11, n12, n13, n14, n15, n16, n17, n18, n19, n20;
         float n21, n22, n23;
 
-        if (Avx.IsSupported)
+        if (MathUtilities.X86SimdSupported)
         {
             Vector128<float> r1, r2, r3, r4;
 
