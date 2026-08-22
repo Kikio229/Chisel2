@@ -28,10 +28,11 @@ internal class D3DDescriptorHeap : Disposable
 
         fixed (Guid* gptr = &ID3D12DescriptorHeap.IID_ID3D12DescriptorHeap)
         {
-            if (device->CreateDescriptorHeap(&desc, gptr, (void**)&heap) != HResult.Ok)
+            HResult result = device->CreateDescriptorHeap(&desc, gptr, (void**)&heap);
+
+            if (result != HResult.Ok)
             {
-                //D3DGraphicsDevice.DumpDebugMessages(device);
-                throw new InvalidOperationException("Failed to create D3D descriptor heap!");
+                throw new InvalidOperationException($"Failed to create D3D descriptor heap! HResult 0x{result:X}");
             }
         }
 

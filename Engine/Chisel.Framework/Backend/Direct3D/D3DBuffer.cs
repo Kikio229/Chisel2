@@ -39,9 +39,11 @@ internal class D3DBuffer : Disposable, IBuffer
 
         fixed (Guid* gptr = &ID3D12Resource.IID_ID3D12Resource)
         {
-            if (allocator.CreateResource(&allocDesc, resDesc, state, null, &allocation, gptr, (void**)&resource) != HResult.Ok)
+            HResult result = allocator.CreateResource(&allocDesc, resDesc, state, null, &allocation, gptr, (void**)&resource);
+
+            if (result != HResult.Ok)
             {
-                throw new InvalidOperationException("Failed to allocate buffer memory!");
+                throw new InvalidOperationException($"Failed to allocate buffer memory! HResult 0x{result:X}");
             }
         }
 

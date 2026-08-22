@@ -78,9 +78,11 @@ internal class D3DImage : Disposable, IImage
             ClearValue c = clear.GetValueOrDefault();
             ClearValue* cptr = (clear.HasValue) ? &c : null;
 
-            if (allocator.CreateResource(&allocDesc, resDesc, state, cptr, &allocation, gptr, (void**)&resource) != HResult.Ok)
+            HResult result = allocator.CreateResource(&allocDesc, resDesc, state, cptr, &allocation, gptr, (void**)&resource);
+
+            if (result != HResult.Ok)
             {
-                throw new InvalidOperationException("Failed to allocate image memory!");
+                throw new InvalidOperationException($"Failed to allocate image memory! HResult 0x{result:X}");
             }
         }
 

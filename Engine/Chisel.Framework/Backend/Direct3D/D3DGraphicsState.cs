@@ -55,10 +55,12 @@ internal class D3DGraphicsState : Disposable, IGraphicsState
 
             fixed (Guid* gptr = &ID3D12RootSignature.IID_ID3D12RootSignature)
             {
-                if (device->CreateRootSignature(0, serialized->GetBufferPointer(), serialized->GetBufferSize(), gptr, (void**)&rootSig) != HResult.Ok)
+                HResult result = device->CreateRootSignature(0, serialized->GetBufferPointer(), serialized->GetBufferSize(), gptr, (void**)&rootSig);
+
+                if (result != HResult.Ok)
                 {
                     D3DUtilities.DumpInfoQueue(device);
-                    throw new InvalidOperationException("Failed to create valid D3D graphics root signature!");
+                    throw new InvalidOperationException($"Failed to create valid D3D graphics root signature! HResult 0x{result:X}");
                 }
             }
         }
@@ -178,10 +180,12 @@ internal class D3DGraphicsState : Disposable, IGraphicsState
 
                 fixed (Guid* gptr = &ID3D12PipelineState.IID_ID3D12PipelineState)
                 {
-                    if (device->CreateGraphicsPipelineState(&pipeDesc, gptr, (void**)&pipeState) != HResult.Ok)
+                    HResult result = device->CreateGraphicsPipelineState(&pipeDesc, gptr, (void**)&pipeState);
+
+                    if (result != HResult.Ok)
                     {
                         D3DUtilities.DumpInfoQueue(device);
-                        throw new InvalidOperationException("Failed to create D3D graphics pipeline state!");
+                        throw new InvalidOperationException($"Failed to create D3D graphics pipeline state! HResult 0x{result:X}");
                     }
                 }
             }
