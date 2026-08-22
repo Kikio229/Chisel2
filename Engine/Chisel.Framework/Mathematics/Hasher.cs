@@ -39,7 +39,6 @@ public class Hasher
         Add(BitConverter.DoubleToUInt64Bits(value));
     }
 
-
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public unsafe void Add(ReadOnlySpan<byte> data)
     {

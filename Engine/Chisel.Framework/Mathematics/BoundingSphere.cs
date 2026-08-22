@@ -187,19 +187,16 @@ public struct BoundingSphere : IEquatable<BoundingSphere>, IFormattable
         }
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public string ToString(string format)
     {
         return ToString(format, null);
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public string ToString(IFormatProvider formatProvider)
     {
         return ToString(null, formatProvider);
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public readonly string ToString(string? format, IFormatProvider? formatProvider)
     {
         return string.Format(
@@ -208,13 +205,11 @@ public struct BoundingSphere : IEquatable<BoundingSphere>, IFormattable
             Radius.ToString(format, formatProvider));
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public override string ToString()
     {
         return ToString(null, null);
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public override readonly int GetHashCode()
     {
         Hasher hasher = new Hasher();

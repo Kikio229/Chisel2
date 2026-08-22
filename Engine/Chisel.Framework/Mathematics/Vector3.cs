@@ -60,7 +60,6 @@ public struct Vector3 : IEquatable<Vector3>, IFormattable
         _value = value;
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public float Length()
     {
         if (MathUtilities.X86SimdSupported)
@@ -72,7 +71,6 @@ public struct Vector3 : IEquatable<Vector3>, IFormattable
         return ((X * X) + (Y * Y) + (Z * Z)).Sqrt();
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public float LengthSquared()
     {
         if (MathUtilities.X86SimdSupported)
@@ -84,13 +82,11 @@ public struct Vector3 : IEquatable<Vector3>, IFormattable
         return (X * X) + (Y * Y) + (Z * Z);
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public float Barycenter(float amt0, float amt1)
     {
         return X + (Y - X) * amt0 + (Z - X) * amt1;
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public float Distance(Vector3 vec)
     {
         if (MathUtilities.X86SimdSupported)
@@ -104,7 +100,6 @@ public struct Vector3 : IEquatable<Vector3>, IFormattable
         return ((X - vec.X) * (X - vec.X) + (Y - vec.Y) * (Y - vec.Y) + (Z - vec.Z) * (Z - vec.Z)).Sqrt();
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public float DistanceSquared(Vector3 vec)
     {
         if (MathUtilities.X86SimdSupported)
@@ -118,7 +113,6 @@ public struct Vector3 : IEquatable<Vector3>, IFormattable
         return (X - vec.X) * (X - vec.X) + (Y - vec.Y) * (Y - vec.Y) + (Z - vec.Z) * (Z - vec.Z);
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public float DotProduct(Vector3 vec)
     {
         if (MathUtilities.X86SimdSupported)
@@ -130,7 +124,6 @@ public struct Vector3 : IEquatable<Vector3>, IFormattable
         return (X * vec.X) + (Y * vec.Y) + (Z * vec.Z);
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Vector3 CrossProduct(Vector3 vec)
     {
         if (MathUtilities.X86SimdSupported)
@@ -146,7 +139,6 @@ public struct Vector3 : IEquatable<Vector3>, IFormattable
         return new Vector3((Y * vec.Z) - (Z * vec.Y), (Z * vec.X) - (X * vec.Z), (X * vec.Y) - (Y * vec.X));
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Vector3 Negate()
     {
         if (MathUtilities.X86SimdSupported)
@@ -158,7 +150,6 @@ public struct Vector3 : IEquatable<Vector3>, IFormattable
         return new Vector3(-X, -Y, -Z);
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Vector3 TransformByMatrix(Matrix4 mat)
     {
         // TODO: Some SIMD optimizations if possible?
@@ -173,7 +164,6 @@ public struct Vector3 : IEquatable<Vector3>, IFormattable
         return new Vector3(x, y, z);
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Vector3 TransformByQuaternion(Quaternion quat)
     {
         // TODO: Some SIMD optimizations if possible?
@@ -192,7 +182,6 @@ public struct Vector3 : IEquatable<Vector3>, IFormattable
             Z + z * quat.W + (quat.X * y - quat.Y * x));
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Vector3 Min(Vector3 vec)
     {
         if (MathUtilities.X86SimdSupported)
@@ -203,7 +192,6 @@ public struct Vector3 : IEquatable<Vector3>, IFormattable
         return new Vector3(X.Min(vec.X), Y.Min(vec.Y), Z.Min(vec.Z));
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Vector3 Max(Vector3 vec)
     {
         if (MathUtilities.X86SimdSupported)
@@ -214,7 +202,6 @@ public struct Vector3 : IEquatable<Vector3>, IFormattable
         return new Vector3(X.Max(vec.X), Y.Max(vec.Y), Z.Max(vec.Z));
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Vector3 Normalize()
     {
         if (MathUtilities.X86SimdSupported)
@@ -236,7 +223,6 @@ public struct Vector3 : IEquatable<Vector3>, IFormattable
         return (len > 0.0f) ? new Vector3(X / len, Y / len, Z / len) : Vector3.Zero;
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Vector3 Lerp(Vector3 vec, float amount)
     {
         if (MathUtilities.X86SimdSupported)
@@ -259,19 +245,16 @@ public struct Vector3 : IEquatable<Vector3>, IFormattable
         return new System.Numerics.Vector3(X, Y, Z);
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public string ToString(string format)
     {
         return ToString(format, null);
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public string ToString(IFormatProvider formatProvider)
     {
         return ToString(null, formatProvider);
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public readonly string ToString(string? format, IFormatProvider? formatProvider)
     {
         return string.Format(
@@ -281,13 +264,11 @@ public struct Vector3 : IEquatable<Vector3>, IFormattable
             Z.ToString(format, formatProvider));
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public override string ToString()
     {
         return ToString(null, null);
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public override readonly int GetHashCode()
     {
         Hasher hasher = new Hasher();

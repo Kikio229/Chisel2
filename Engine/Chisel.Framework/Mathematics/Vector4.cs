@@ -68,7 +68,6 @@ public struct Vector4 : IEquatable<Vector4>, IFormattable
         _value = value;
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public float Length()
     {
         if (MathUtilities.X86SimdSupported)
@@ -80,7 +79,6 @@ public struct Vector4 : IEquatable<Vector4>, IFormattable
         return ((X * X) + (Y * Y) + (Z * Z) + (W * W)).Sqrt();
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public float LengthSquared()
     {
         if (MathUtilities.X86SimdSupported)
@@ -92,7 +90,6 @@ public struct Vector4 : IEquatable<Vector4>, IFormattable
         return (X * X) + (Y * Y) + (Z * Z) + (W * W); 
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public float Distance(Vector4 vec)
     {
         if (MathUtilities.X86SimdSupported)
@@ -106,7 +103,6 @@ public struct Vector4 : IEquatable<Vector4>, IFormattable
         return ((X - vec.X) * (X - vec.X) + (Y - vec.Y) * (Y - vec.Y) + (Z - vec.Z) * (Z - vec.Z) + (W - vec.W) * (W - vec.W)).Sqrt();
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public float DistanceSquared(Vector4 vec)
     {
         if (MathUtilities.X86SimdSupported)
@@ -120,7 +116,6 @@ public struct Vector4 : IEquatable<Vector4>, IFormattable
         return (X - vec.X) * (X - vec.X) + (Y - vec.Y) * (Y - vec.Y) + (Z - vec.Z) * (Z - vec.Z) + (W - vec.W) * (W - vec.W);
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public float DotProduct(Vector4 vec)
     {
         if (MathUtilities.X86SimdSupported)
@@ -132,7 +127,6 @@ public struct Vector4 : IEquatable<Vector4>, IFormattable
         return (X * vec.X) + (Y * vec.Y) + (Z * vec.Z) + (W * vec.W);
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Vector4 Negate()
     {
         if (MathUtilities.X86SimdSupported)
@@ -144,7 +138,6 @@ public struct Vector4 : IEquatable<Vector4>, IFormattable
         return new Vector4(-X, -Y, -Z, -W);
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Vector4 TransformByMatrix(Matrix4 mat)
     {
         // TODO: Some SIMD optimizations if possible?
@@ -160,7 +153,6 @@ public struct Vector4 : IEquatable<Vector4>, IFormattable
         return new Vector4(x, y, z, w);
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Vector4 Min(Vector4 vec)
     {
         if (MathUtilities.X86SimdSupported)
@@ -171,7 +163,6 @@ public struct Vector4 : IEquatable<Vector4>, IFormattable
         return new Vector4(X.Min(vec.X), Y.Min(vec.Y), Z.Min(vec.Z), W.Min(vec.W));
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Vector4 Max(Vector4 vec)
     {
         if (MathUtilities.X86SimdSupported)
@@ -182,7 +173,6 @@ public struct Vector4 : IEquatable<Vector4>, IFormattable
         return new Vector4(X.Max(vec.X), Y.Max(vec.Y), Z.Max(vec.Z), W.Max(vec.W));
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Vector4 Normalize()
     {
         if (MathUtilities.X86SimdSupported)
@@ -204,7 +194,6 @@ public struct Vector4 : IEquatable<Vector4>, IFormattable
         return (len > 0.0f) ? new Vector4(X / len, Y / len, Z / len, W / len) : Vector4.Zero;
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Vector4 Lerp(Vector4 vec, float amount)
     {
         if (MathUtilities.X86SimdSupported)
@@ -228,19 +217,16 @@ public struct Vector4 : IEquatable<Vector4>, IFormattable
         return new System.Numerics.Vector4(X, Y, Z, W);
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public string ToString(string format)
     {
         return ToString(format, null);
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public string ToString(IFormatProvider formatProvider)
     {
         return ToString(null, formatProvider);
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public readonly string ToString(string? format, IFormatProvider? formatProvider)
     {
         return string.Format(
@@ -251,13 +237,11 @@ public struct Vector4 : IEquatable<Vector4>, IFormattable
             W.ToString(format, formatProvider));
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public override string ToString()
     {
         return ToString(null, null);
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public override readonly int GetHashCode()
     {
         Hasher hasher = new Hasher();

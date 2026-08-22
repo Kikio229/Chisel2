@@ -114,7 +114,6 @@ public struct Matrix3 : IEquatable<Matrix3>, IFormattable
         _bottom = bottom;
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Matrix3 Negate()
     {
         Matrix3 result = Matrix3.Zero;
@@ -141,7 +140,6 @@ public struct Matrix3 : IEquatable<Matrix3>, IFormattable
         return result;
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public System.Numerics.Matrix4x4 ToNumerics()
     {
         return new System.Numerics.Matrix4x4(
@@ -151,19 +149,16 @@ public struct Matrix3 : IEquatable<Matrix3>, IFormattable
             0f, 0f, 0f, 0f);
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public string ToString(string format)
     {
         return ToString(format, null);
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public string ToString(IFormatProvider formatProvider)
     {
         return ToString(null, formatProvider);
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public readonly string ToString(string? format, IFormatProvider? formatProvider)
     {
         return string.Format(
@@ -179,13 +174,11 @@ public struct Matrix3 : IEquatable<Matrix3>, IFormattable
             M33.ToString(format, formatProvider));
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public override string ToString()
     {
         return ToString(null, null);
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public override readonly int GetHashCode()
     {
         Hasher hasher = new Hasher();

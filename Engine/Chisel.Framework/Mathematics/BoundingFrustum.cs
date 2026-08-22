@@ -133,7 +133,6 @@ public struct BoundingFrustum : IEquatable<BoundingFrustum>, IFormattable
         return type;
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public readonly string ToString(string? format, IFormatProvider? formatProvider)
     {
         return string.Format(
@@ -142,13 +141,11 @@ public struct BoundingFrustum : IEquatable<BoundingFrustum>, IFormattable
             Corners.ToString());
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public override string ToString()
     {
         return ToString(null, null);
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public override readonly int GetHashCode()
     {
         return Planes.GetHashCode() ^ Corners.GetHashCode();

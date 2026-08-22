@@ -217,13 +217,11 @@ public struct Color : IEquatable<Color>, IFormattable
         _value = ((uint)a << 24) | ((uint)b << 16) | ((uint)g << 8) | (r);
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Vector4 ToVector4()
     {
         return new Vector4(R, G, B, A);
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Vector4 ToVector4Normalized()
     {
         return new Vector4(
@@ -231,6 +229,39 @@ public struct Color : IEquatable<Color>, IFormattable
             G / 255f, 
             B / 255f, 
             A / 255f);
+    }
+
+    public override readonly int GetHashCode()
+    {
+        Hasher hasher = new Hasher();
+        hasher.Add(_value);
+        return (int)hasher.Finalize32();
+    }
+
+    public override string ToString()
+    {
+        return ToString(null, null);
+    }
+
+    public string ToString(string format)
+    {
+        return ToString(format, null);
+    }
+
+    public string ToString(IFormatProvider formatProvider)
+    {
+        return ToString(null, formatProvider);
+    }
+
+    public readonly string ToString(string format, IFormatProvider formatProvider)
+    {
+        return string.Format(
+            "({0}, {1}, {2}, {3})",
+            R.ToString(format, formatProvider),
+            G.ToString(format, formatProvider),
+            B.ToString(format, formatProvider),
+            A.ToString(format, formatProvider)
+        );
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -243,44 +274,6 @@ public struct Color : IEquatable<Color>, IFormattable
     public override bool Equals(object? obj)
     {
         return obj is Color other && Equals(other);
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public override readonly int GetHashCode()
-    {
-        Hasher hasher = new Hasher();
-        hasher.Add(_value);
-        return (int)hasher.Finalize32();
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public override string ToString()
-    {
-        return ToString(null, null);
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public string ToString(string format)
-    {
-        return ToString(format, null);
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public string ToString(IFormatProvider formatProvider)
-    {
-        return ToString(null, formatProvider);
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public readonly string ToString(string format, IFormatProvider formatProvider)
-    {
-        return string.Format(
-            "({0}, {1}, {2}, {3})",
-            R.ToString(format, formatProvider),
-            G.ToString(format, formatProvider),
-            B.ToString(format, formatProvider),
-            A.ToString(format, formatProvider)
-        );
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

@@ -41,25 +41,21 @@ public struct Plane : IEquatable<Plane>, IFormattable
         Distance = -Normal.DotProduct(vec1);
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public float Dot(Vector4 value)
     {
         return Normal.DotProduct(value.XYZ) + (Distance * value.W);
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public float DotNormal(Vector3 value)
     {
         return Normal.DotProduct(value);
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public float DotCoordinate(Vector3 value)
     {
         return Normal.DotProduct(value) + Distance;
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public PlaneIntersectType Intersects(Vector3 point)
     {
         float distance = DotCoordinate(point);
@@ -77,13 +73,11 @@ public struct Plane : IEquatable<Plane>, IFormattable
         return PlaneIntersectType.Intersect;
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Plane TransformByQuaternion(Quaternion quat)
     {
         return new Plane(Distance, Normal.TransformByQuaternion(quat));
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Plane TransformByMatrix(Matrix4 matrix)
     {
         Matrix4 transMat = matrix.Invert().Transpose();
@@ -92,7 +86,6 @@ public struct Plane : IEquatable<Plane>, IFormattable
         return new Plane(transVec);
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Plane Normalize()
     {
         float length = Normal.Length();
@@ -102,19 +95,16 @@ public struct Plane : IEquatable<Plane>, IFormattable
         return new Plane(distance, normal);
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public string ToString(string format)
     {
         return ToString(format, null);
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public string ToString(IFormatProvider formatProvider)
     {
         return ToString(null, formatProvider);
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public readonly string ToString(string? format, IFormatProvider? formatProvider)
     {
         return string.Format(
@@ -123,13 +113,11 @@ public struct Plane : IEquatable<Plane>, IFormattable
             Distance.ToString(format, formatProvider));
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public override string ToString()
     {
         return ToString(null, null);
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public override readonly int GetHashCode()
     {
         Hasher hasher = new Hasher();
