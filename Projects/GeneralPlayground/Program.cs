@@ -669,7 +669,7 @@ public class TestGame : Game
         // ---------------------------------------------------------------------
 
         const int SpiralArms = 4;
-        const int PerArm = 150;
+        const int PerArm = 1500;
 
         for (int arm = 0; arm < SpiralArms; arm++)
         {

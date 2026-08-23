@@ -1,4 +1,4 @@
-﻿using Chisel.Framework.Backend.Direct3D;
+﻿
 using Chisel.Resource;
 using Hexa.NET.SDL3;
 using System;
@@ -67,6 +67,7 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
     private uint _cbvFrameStride, _srvFrameStride, _uavFrameStride;
     private uint _cbvRegionStart, _srvRegionStart, _uavRegionStart;
     private uint _resourceHeapCapacity;
+    private const uint _maxResourceHeapCapacity = 1000000;
     private bool _isPendingResourceHeapGrow;
     private const uint _cbvRangeSize = 16;
     private const uint _srvRangeSize = 16;
@@ -76,7 +77,7 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
 
     private uint _pendingDrawsPerFrameCap;
 
-    private readonly Dictionary<SamplerKey, CpuDescriptorHandle> _samplerCache = new();
+    private readonly Dictionary<D3DSamplerKey, CpuDescriptorHandle> _samplerCache = new();
     private readonly Dictionary<ulong, uint> _samplerTableReuseCache = new();
     private D3DDescriptorHeap _samplerCacheHeap;
     private uint _samplerCacheCursor;
@@ -102,15 +103,8 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
     // This means we will shell out some memory constantly to this "arena buffer", but it means that
     // smaller and simpler cbuffers can flood it quickly without allocating more memory every time they grow.
     private ulong _cbufferArenaCapacity = 32 * 1024 * 1024;
-    private D3DBuffer[] _cbufferArenas;
-    private unsafe void*[] _cbufferArenaMapped;
-    private ulong[] _cbufferArenaCursor;
-    private List<D3DBuffer>[] _cbufferOverflowBuffers; // And just in case...
-    private bool[] _cbufferArenaPendingGrow;
+    private D3DBufferRing[] _cbufferRings;
 
-    // Avoid wasting buffer space on duped data
-    private const uint _cbufferReuseSlots = 16384;
-    private const int _cbufferReuseMaxProbe = 32;
 
     // Bump cursors, reset every BeginFrame (safe: EndFrame already blocks until the GPU has fully
     // finished the previous frame, so nothing can still be reading these slots).
@@ -215,7 +209,21 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
     {
         WaitForGPU();
 
-        _drawsPerFrameCap = Math.Max(_pendingDrawsPerFrameCap, _drawsPerFrameCap * 2);
+        uint perDrawDescriptors = _cbvRangeSize + _srvRangeSize + _uavRangeSize;
+        uint maxSafeDrawsPerFrameCap = _maxResourceHeapCapacity / (_maxFramesInFlight * perDrawDescriptors);
+
+        uint desired = Math.Max(_pendingDrawsPerFrameCap, _drawsPerFrameCap * 2);
+
+        if (desired > maxSafeDrawsPerFrameCap)
+        {
+            Logger.AppendWarn(
+                $"Clamping resource heap growth to the {_maxResourceHeapCapacity}-descriptor safe ceiling " +
+                $"({maxSafeDrawsPerFrameCap} draws/frame) instead of the requested {desired}.");
+
+            desired = maxSafeDrawsPerFrameCap;
+        }
+
+        _drawsPerFrameCap = desired;
         _pendingDrawsPerFrameCap = 0;
         RecomputeResourceHeapLayout();
 
@@ -223,20 +231,6 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
         _resourceHeap = new D3DDescriptorHeap((ID3D12Device*)_device.Get(), DescriptorHeapType.CbvSrvUav, _resourceHeapCapacity, shaderVisible: true);
 
         Logger.AppendLog("D3D", $"Grew resource heap to {_drawsPerFrameCap} draws/frame.", ConsoleColor.Yellow, 1);
-    }
-    private unsafe void GrowCbufferArena(uint lane)
-    {
-        _cbufferArenas[lane].Resource->Unmap(0, null);
-        _cbufferArenas[lane].Dispose();
-
-        D3DBuffer newArena = new D3DBuffer(_allocator, _cbufferArenaCapacity, BufferType.Upload, BufferUsage.Constant);
-        void* mapped;
-        newArena.Resource->Map(0, null, &mapped);
-
-        _cbufferArenas[lane] = newArena;
-        _cbufferArenaMapped[lane] = mapped;
-
-        Logger.AppendLog("D3D", $"Grew cbuffer arena for frame lane {lane} to {_cbufferArenaCapacity} bytes.", ConsoleColor.Yellow, 1);
     }
 
     public unsafe void BeginFrame()
@@ -256,11 +250,7 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
             _mainFenceEvent.WaitOne();
         }
 
-        if (_cbufferArenaPendingGrow[_frameIndex])
-        {
-            GrowCbufferArena(_frameIndex);
-            _cbufferArenaPendingGrow[_frameIndex] = false;
-        }
+        _cbufferRings[_frameIndex].Begin();
 
         _cbvBumpCursor = 0;
         _srvBumpCursor = 0;
@@ -268,16 +258,6 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
         _samplerBumpCursor = 0;
         _samplerTableReuseCache.Clear();
         _hasDescriptorBlock = false;
-
-        // reset the buffer cursor
-        _cbufferArenaCursor[_frameIndex] = 0;
-
-        foreach (var o in _cbufferOverflowBuffers[_frameIndex])
-        {
-            o.Dispose();
-        }
-
-        _cbufferOverflowBuffers[_frameIndex].Clear();
 
         _mainCmdAllocs[_frameIndex].Get()->Reset();
         _mainCmdList.Get()->Reset(_mainCmdAllocs[_frameIndex].Get(), null);
@@ -321,31 +301,25 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
             _pendingDrawsPerFrameCap = Math.Max(_pendingDrawsPerFrameCap, _drawsPerFrameCap * 2);
         }
 
-        List<D3DBuffer> cbufferOverflow = _cbufferOverflowBuffers[_frameIndex];
-        bool cbufferOverflowed = cbufferOverflow.Count > 0;
+        D3DBufferRing cbufferRing = _cbufferRings[_frameIndex];
+        bool cbufferOverflowed = cbufferRing.OverflowCount > 0;
 
-        if (cbufferOverflowed || _cbufferArenaCursor[_frameIndex] > _cbufferArenaCapacity * growThreshold)
+        if (cbufferOverflowed || cbufferRing.Cursor > _cbufferArenaCapacity * growThreshold)
         {
-            ulong overflowBytes = 0;
-            foreach (var b in cbufferOverflow)
-            {
-                overflowBytes += (ulong)b.Size;
-            }
-
-            ulong demand = _cbufferArenaCursor[_frameIndex] + overflowBytes;
+            ulong demand = cbufferRing.Cursor + cbufferRing.Overflow;
             ulong oldCapacity = _cbufferArenaCapacity;
             ulong target = Math.Max(_cbufferArenaCapacity * 2, (ulong)(demand * 1.5));
             _cbufferArenaCapacity = (target + 0x3FFFFul) & ~0x3FFFFul; // round up to 256KB
 
             for (int lane = 0; lane < _maxFramesInFlight; lane++)
             {
-                _cbufferArenaPendingGrow[lane] = true;
+                _cbufferRings[lane].RequestGrow(_cbufferArenaCapacity);
             }
 
             if (cbufferOverflowed)
             {
                 Logger.AppendWarn(
-                    $"Constant buffer arena overflowed ({cbufferOverflow.Count} dedicated fallback binds, " +
+                    $"Constant buffer arena overflowed ({cbufferRing.OverflowCount} dedicated fallback binds, " +
                     $"{demand} bytes of unique demand vs {oldCapacity} byte budget). Growing to {_cbufferArenaCapacity} bytes.");
             }
         }
@@ -888,22 +862,7 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
 
     public unsafe (IBuffer arena, ulong offset) SuballocateBuffer(ReadOnlySpan<byte> data)
     {
-        uint lane = _frameIndex;
-        ulong aligned = (_cbufferArenaCursor[lane] + 255) & ~255ul;
-
-        if (aligned + (ulong)data.Length > _cbufferArenaCapacity)
-        {
-            ulong paddedSize = ((ulong)data.Length + 255) & ~255ul;
-            D3DBuffer fallback = new D3DBuffer(_allocator, paddedSize, BufferType.Upload, BufferUsage.Constant);
-            UpdateBuffer(fallback, data, 0);
-            _cbufferOverflowBuffers[lane].Add(fallback);
-            return (fallback, 0);
-        }
-
-        data.CopyTo(new Span<byte>((byte*)_cbufferArenaMapped[lane] + aligned, data.Length));
-        _cbufferArenaCursor[lane] = aligned + (ulong)data.Length;
-
-        return (_cbufferArenas[lane], aligned);
+        return _cbufferRings[_frameIndex].AllocBuffer(data);
     }
 
     public void CopyBuffer(IBuffer bufSrc, IBuffer bufDst)
@@ -1313,27 +1272,16 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
             // just in case
             WaitForGPU();
 
-            if (_cbufferArenas != null)
+            if (_cbufferRings != null)
             {
-                for (int i = 0; i < _cbufferArenas.Length; i++)
+                foreach (D3DBufferRing ring in _cbufferRings)
                 {
-                    _cbufferArenas[i].Resource->Unmap(0, null);
-                    _cbufferArenas[i].Dispose();
-
-                    foreach (var o in _cbufferOverflowBuffers[i])
-                    {
-                        o.Dispose();
-                    }
+                    ring.Dispose();
                 }
             }
 
-            foreach (var l in _cbufferOverflowBuffers)
-            {
-                foreach (var b in l)
-                {
-                    b.Dispose();
-                }
-            }
+            _mainFenceEvent.Dispose();
+            _uploadFenceEvent.Dispose();
 
             _factory.Dispose();
             _adapter.Dispose();
@@ -1776,7 +1724,7 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
     }
     private unsafe CpuDescriptorHandle GetOrCreateCachedSampler(D3DSampler d3dSampler)
     {
-        SamplerKey key = new SamplerKey(d3dSampler.FilterMode, d3dSampler.WrapMode, d3dSampler.DetailBias);
+        D3DSamplerKey key = new D3DSamplerKey(d3dSampler.FilterMode, d3dSampler.WrapMode, d3dSampler.DetailBias);
 
         if (_samplerCache.TryGetValue(key, out CpuDescriptorHandle cached))
         {
@@ -2356,20 +2304,11 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
 
     private unsafe void InitBufferArenas()
     {
-        _cbufferArenas = new D3DBuffer[_maxFramesInFlight];
-        _cbufferArenaMapped = new void*[_maxFramesInFlight];
-        _cbufferArenaCursor = new ulong[_maxFramesInFlight];
-        _cbufferOverflowBuffers = new List<D3DBuffer>[_maxFramesInFlight];
-        _cbufferArenaPendingGrow = new bool[_maxFramesInFlight];
+        _cbufferRings = new D3DBufferRing[_maxFramesInFlight];
 
         for (int i = 0; i < _maxFramesInFlight; i++)
         {
-            _cbufferArenas[i] = new D3DBuffer(_allocator, _cbufferArenaCapacity, BufferType.Upload, BufferUsage.Constant);
-            _cbufferOverflowBuffers[i] = new List<D3DBuffer>();
-
-            void* mapped;
-            _cbufferArenas[i].Resource->Map(0, null, &mapped);
-            _cbufferArenaMapped[i] = mapped;
+            _cbufferRings[i] = new D3DBufferRing(_allocator, _cbufferArenaCapacity);
         }
     }
 

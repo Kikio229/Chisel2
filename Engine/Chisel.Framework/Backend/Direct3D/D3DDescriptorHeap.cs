@@ -32,6 +32,7 @@ internal class D3DDescriptorHeap : Disposable
 
             if (result != HResult.Ok)
             {
+                D3DUtilities.DumpInfoQueue(device);
                 throw new InvalidOperationException($"Failed to create D3D descriptor heap! HResult 0x{result:X}");
             }
         }
