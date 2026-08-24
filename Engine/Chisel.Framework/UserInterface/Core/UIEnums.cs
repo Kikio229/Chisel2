@@ -6,8 +6,8 @@ namespace Chisel.Framework.UI;
 public enum UIAnchor
 {
     Center = 0,
-    Top = 1 << 0,
-    Left = 1 << 1,
-    Right = 1 << 2,
-    Bottom = 1 << 2,
+    Top = 1 << 1,
+    Left = 1 << 2,
+    Right = 1 << 3,
+    Bottom = 1 << 4,
 }

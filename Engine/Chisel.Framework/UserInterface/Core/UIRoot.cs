@@ -17,7 +17,7 @@ public class UIRoot : UIObject
     {
     }
 
-    public override void OnRender(float dt)
+    public override void OnRender(float dt, SpriteBatch batch, Texture2D atlasTexture)
     {
     }
 

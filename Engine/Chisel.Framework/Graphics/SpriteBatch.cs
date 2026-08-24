@@ -119,11 +119,12 @@ public class SpriteBatch : IDisposable
 
         device.Clear(Color.Black, 1.0f, 0, GraphicsClearFlags.Depth);
     }
-    public void DrawString(string text, int fontSize, Vector2 position, Color color)
+    public void DrawString(string text, int fontSize, Vector2 position, Color color, FontSystemEffect effect = FontSystemEffect.None, int effectStrength = 0)
     {
         var fnt = fontSystem.GetFont(fontSize);
 
-        fnt.DrawText(fontRenderer, text, position.ToNumerics(), new FSColor(color.R, color.G, color.B, color.A));
+        fnt.DrawText(fontRenderer, text, position.ToNumerics(), new FSColor(color.R, color.G, color.B, color.A),
+            effect:effect,effectAmount:effectStrength);
     }
     public void Draw(Texture2D texture, Vector2 position, Vector2 size, Color color, Rectangle? sourceRectangle = null, float rotation = 0f, Vector2 origin = default)
     {

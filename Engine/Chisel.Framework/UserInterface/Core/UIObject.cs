@@ -1,13 +1,15 @@
-﻿using System.Linq;
+﻿using System.Collections.Generic;
+using System.Linq;
 
 namespace Chisel.Framework.UI;
 
 public abstract class UIObject(UILayoutOptions options)
 {
     public UIObject Parent;
-    public UIObject[] Children;
+    public List<UIObject> Children = [];
     public Vector2 CenterOffset;
     public Vector2 HalfExtents;
+    public Color Tint = Color.White;
     public UIAnchor Anchor;
     public float RotationOffset;
 
@@ -18,14 +20,14 @@ public abstract class UIObject(UILayoutOptions options)
 
     protected bool IsHighlighted { get; set; }
 
-    public Vector2 Up
+    public Vector2 Right
     {
         get
         {
             return new(float.Cos(RotationOffset), float.Sin(RotationOffset));
         }
     }
-    public Vector2 Right
+    public Vector2 Up
     {
         get
         {
@@ -53,24 +55,24 @@ public abstract class UIObject(UILayoutOptions options)
 
             var localPos = CenterOffset;
 
-            if ((Anchor & UIAnchor.Left) == 0)
+            if (Anchor.HasFlag(UIAnchor.Left))
             {
                 localPos.X = -(pDim.X - HalfExtents.X) + CenterOffset.X;
             }
-            if ((Anchor & UIAnchor.Right) == 0)
+            if (Anchor.HasFlag(UIAnchor.Right))
             {
                 localPos.X = (pDim.X - HalfExtents.X) + CenterOffset.X;
             }
-            if ((Anchor & UIAnchor.Bottom) == 0)
+            if (Anchor.HasFlag(UIAnchor.Bottom))
             {
                 localPos.Y = -(pDim.Y - HalfExtents.Y) + CenterOffset.Y;
             }
-            if ((Anchor & UIAnchor.Top) == 0)
+            if (Anchor.HasFlag(UIAnchor.Top))
             {
                 localPos.Y = (pDim.Y - HalfExtents.Y) + CenterOffset.Y;
             }
 
-            return pRight * localPos.X + pUp * localPos.Y;
+            return pRight * localPos.X + pUp * localPos.Y + pPos;
         }
     }
 
@@ -93,7 +95,7 @@ public abstract class UIObject(UILayoutOptions options)
         // jump to the inner object. Of course we only want to jump
         // to a child that allows navigation, so not something like a
         // label.
-        if (Children != null && Children.Length > 0 && Children.Any(c => c.AllowNavigatingTo))
+        if (Children != null && Children.Count > 0 && Children.Any(c => c.AllowNavigatingTo))
             return Children.First(c => c.AllowNavigatingTo);
 
         if (LayoutOptions.NextSibling != null) return LayoutOptions.NextSibling;
@@ -102,10 +104,30 @@ public abstract class UIObject(UILayoutOptions options)
         return Parent.GetNextSibling();
     }
 
+    public void Update(float dt)
+    {
+        OnUpdate(dt);
+
+        foreach (var c in Children) c.Update(dt);
+    }
+    public void Render(float dt, SpriteBatch batch, Texture2D atlasTexture)
+    {
+        OnRender(dt, batch, atlasTexture);
+
+        foreach (var c in Children) c.Render(dt,batch,atlasTexture);
+    }
+
     public abstract void OnUpdate(float dt);
-    public abstract void OnRender(float dt);
+    public abstract void OnRender(float dt, SpriteBatch batch, Texture2D atlasTexture);
     public abstract void OnHighlighted();
     public abstract void OnUnhighlighted();
     public abstract void OnPrimaryClicked();
     public abstract void OnSecondaryClicked();
+
+    protected static bool IsMouseOverRect(Rectangle rect)
+    {
+        var mouse = InputManager.MousePosition;
+
+        return rect.ContainsVector(mouse);
+    }
 }

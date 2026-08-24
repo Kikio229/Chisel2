@@ -15,6 +15,22 @@ public enum CursorMode
     Hidden = 1 << 2,
 }
 
+public enum CursorStyle
+{
+    Arrow,
+    IBeam,
+    Wait,
+    Crosshair,
+    WaitArrow,
+    SizeAll,
+    SizeWE,
+    SizeNS,
+    SizeNE,
+    SizeNW,
+    No,
+    Hand
+}
+
 public class Window : Disposable
 {
     public string Title { get; private set; }
@@ -37,7 +53,10 @@ public class Window : Disposable
     public unsafe SDLGLContext GLContext { get; private set; }
     public bool IsDebug { get; set; }
 
+    private CursorStyle cursor;
+
     internal unsafe SDLWindow* Handle { get; private set; }
+    internal unsafe SDLCursor* Cursor { get; private set; }
     internal event Action? Startup, Shutdown, FocusGain, FocusLost;
     internal event Action<int, int>? Resize, Reposition;
     internal event Action<double>? TickUpdate, FrameUpdate;
@@ -267,6 +286,7 @@ public class Window : Disposable
         }
 
         Shutdown?.Invoke();
+        SDL.DestroyCursor(Cursor);
     }
 
     public void Close()
@@ -510,6 +530,51 @@ public class Window : Disposable
         }
 
         CursorMode = mode;
+    }
+    public CursorStyle GetCursorStyle() => cursor;
+    public unsafe void SetCursorStyle(CursorStyle style)
+    {
+        switch (style)
+        {
+            case CursorStyle.Arrow:
+                Cursor = SDL.CreateSystemCursor(SDLSystemCursor.Default);
+                break;
+            case CursorStyle.IBeam:
+                Cursor = SDL.CreateSystemCursor(SDLSystemCursor.Text);
+                break;
+            case CursorStyle.Wait:
+                Cursor = SDL.CreateSystemCursor(SDLSystemCursor.Wait);
+                break;
+            case CursorStyle.Crosshair:
+                Cursor = SDL.CreateSystemCursor(SDLSystemCursor.Crosshair);
+                break;
+            case CursorStyle.WaitArrow:
+                Cursor = SDL.CreateSystemCursor(SDLSystemCursor.Progress);
+                break;
+            case CursorStyle.SizeAll:
+                Cursor = SDL.CreateSystemCursor(SDLSystemCursor.Move);
+                break;
+            case CursorStyle.SizeWE:
+                Cursor = SDL.CreateSystemCursor(SDLSystemCursor.EwResize);
+                break;
+            case CursorStyle.SizeNS:
+                Cursor = SDL.CreateSystemCursor(SDLSystemCursor.NsResize);
+                break;
+            case CursorStyle.SizeNE:
+                Cursor = SDL.CreateSystemCursor(SDLSystemCursor.NeResize);
+                break;
+            case CursorStyle.SizeNW:
+                Cursor = SDL.CreateSystemCursor(SDLSystemCursor.NwResize);
+                break;
+            case CursorStyle.No:
+                Cursor = SDL.CreateSystemCursor(SDLSystemCursor.NotAllowed);
+                break;
+            case CursorStyle.Hand:
+                Cursor = SDL.CreateSystemCursor(SDLSystemCursor.Pointer);
+                break;
+        }
+        cursor = style;
+        SDL.SetCursor(Cursor);
     }
 
     public void SetVsyncMode(bool enabled)

@@ -1,7 +1,7 @@
 ﻿using Chisel.Framework;
+using Chisel.Framework.UI;
 using Chisel.Framework.Utilities;
 using Chisel.Resource;
-using Microsoft.Xna.Framework;
 using System;
 using System.Runtime.InteropServices;
 
@@ -33,7 +33,7 @@ public class TestGame : Game
 
     // Camera state
     Vector3 cameraPosition = new Vector3(0, 1.5f, 4f);
-    float yaw = -MathHelper.PiOver2; // facing -Z toward the cube
+    float yaw = -float.Pi/2; // facing -Z toward the cube
     float pitch = 0f;
     const float MouseSensitivity = 0.0025f;
     const float MoveSpeed = 4f;
@@ -46,7 +46,9 @@ public class TestGame : Game
     Vector3 forward;
     double elapsed;
 
-    public TestGame() : base(GraphicsBackend.Direct3D12, false)
+    private UIManager uiManager;
+
+    public TestGame() : base(GraphicsBackend.OpenGL46, false)
     {
         Window.SetVsyncMode(false);
     }
@@ -68,6 +70,8 @@ public class TestGame : Game
             WrapMode = SamplerWrapMode.Repeat,
         });
 
+        uiManager = new UIManager();
+
         //imgui = new ImGuiRenderer(this);
         //imgui.RebuildFontAtlas();
 
@@ -83,6 +87,14 @@ public class TestGame : Game
         screenTexture = new RenderTarget2D(GraphicsDevice, Window.Resolution.W, Window.Resolution.H,
             ImageFormat.R32G32B32A32Float, ImageFormat.D24UNormS8UInt, 4);
 
+        uiManager.SetSize(Window.Resolution.W, Window.Resolution.H);
+
+        uiManager.AddToRoot(new UIWindow("Test window",default)
+        {
+            Anchor = UIAnchor.Center,
+            HalfExtents = new(128),
+            CenterOffset = new(0,0)
+        });
 
         UpdateProjection();
     }
@@ -90,8 +102,8 @@ public class TestGame : Game
     void UpdateProjection()
     {
         float aspect = Window.Resolution.W / (float)Window.Resolution.H;
-        projection = Matrix4.CreatePerspectiveFieldOfView(
-            MathHelper.ToRadians(70f), aspect, 0.1f, 100f);
+        projection = Matrix4.FromPerspectiveFov(
+            float.DegreesToRadians(70f), aspect, 0.1f, 100f);
     }
     void BuildCube()
     {
@@ -176,6 +188,8 @@ public class TestGame : Game
 
         screenTexture.Resize(Window.Resolution.W, Window.Resolution.H);
 
+        uiManager.SetSize(width,height);
+
         UpdateProjection();
     }
     protected override void OnFrameUpdate(double delta)
@@ -189,19 +203,19 @@ public class TestGame : Game
             Vector2 md = InputManager.MouseDelta;
             yaw += md.X * MouseSensitivity;
             pitch -= md.Y * MouseSensitivity;
-            pitch = MathHelper.Clamp(pitch, -MathHelper.PiOver2 + 0.01f, MathHelper.PiOver2 - 0.01f);
+            pitch = float.Clamp(pitch, -(float.Pi / 2) + 0.01f, (float.Pi / 2) - 0.01f);
         }
         else
         {
             Window.SetCursorMode(CursorMode.Normal);
         }
 
-        forward = Vector3.Normalize(new Vector3(
+        forward = (new Vector3(
             MathF.Cos(pitch) * MathF.Cos(yaw),
             MathF.Sin(pitch),
-            MathF.Cos(pitch) * MathF.Sin(yaw)));
+            MathF.Cos(pitch) * MathF.Sin(yaw))).Normalize();
 
-        Vector3 right = Vector3.Normalize(Vector3.Cross(forward, Vector3.Up));
+        Vector3 right = (forward.CrossProduct(Vector3.UnitY)).Normalize();
 
         float speed = InputManager.IsInputHeld(Input.KeyLShift) ? FastMoveSpeed : MoveSpeed;
         float move = speed * (float)delta;
@@ -211,7 +225,9 @@ public class TestGame : Game
         if (InputManager.IsInputHeld(Input.KeyA)) cameraPosition -= right * move;
         if (InputManager.IsInputHeld(Input.KeyD)) cameraPosition += right * move;
 
-        view = Matrix4.CreateLookAt(cameraPosition, cameraPosition + forward, Vector3.Up);
+        view = Matrix4.FromLookAt(cameraPosition, cameraPosition + forward, Vector3.UnitY);
+
+        uiManager.FrameUpdate((float)delta);
     }
 
     protected override void OnDrawFrame(double delta)
@@ -229,12 +245,12 @@ public class TestGame : Game
         cubeShader.Parameters["Time"]?.SetValue((float)elapsed);
         cubeShader.Parameters["ScreenSize"]?.SetValue(new Vector2(Window.Resolution.W, Window.Resolution.H));
 
-        Matrix4 world = Matrix4.CreateRotationY((float)elapsed * 0.5f);
+        Matrix4 world = Matrix4.FromRotationY((float)elapsed * 0.5f);
         cubeShader.Parameters["World"]?.SetValue(world);
 
         // One warm point light orbiting the cube.
         Vector3 lightPos = new Vector3(MathF.Cos((float)elapsed) * 3f, 1.5f, MathF.Sin((float)elapsed) * 3f);
-        var positions = new[] { new Vector4(lightPos, 6f) };            // xyz = pos, w = range
+        var positions = new[] { new Vector4(lightPos.X, lightPos.Y, lightPos.Z, 6f) };            // xyz = pos, w = range
         var colors = new[] { new Vector4(1f, 0.85f, 0.6f, 2.5f) };   // rgb = color, a = intensity
         var spotData = new[] { Vector4.Zero };                          // w = 0 -> omni light
 
@@ -252,15 +268,13 @@ public class TestGame : Game
 
         screenTexture.End();
 
-        spriteBatch.Begin(Matrix4.CreateOrthographicOffCenter(0, Window.Resolution.W, Window.Resolution.H, 0, 0, 1));
+        spriteBatch.Begin(Matrix4.FromOrthographic(0, Window.Resolution.W, Window.Resolution.H, 0, 0, 1));
 
         spriteBatch.Draw(screenTexture, Vector2.Zero, new(Window.Resolution.W, Window.Resolution.H), Color.White);
-        //spriteBatch.Draw(skiaSurface.Texture, Vector2.Zero, new(Window.Resolution.W, Window.Resolution.H), Color.White);
-
-        spriteBatch.Draw(testUItex, Vector2.Zero, new(testUItex.Width, testUItex.Height), Color.White);
-        spriteBatch.DrawString("Hello world!", 20, Vector2.One * 25f, Color.White);
 
         spriteBatch.End();
+
+        uiManager.FrameRender((float)delta, spriteBatch, testUItex);
     }
     protected override void OnShutdown()
     {
