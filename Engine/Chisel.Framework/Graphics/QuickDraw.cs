@@ -160,7 +160,7 @@ public static class QuickDraw
 
         device.BindGraphicsState(state);
         currentShader?.Apply();
-        device.BindMaterialTable(currentMaterial);
+        if(currentMaterial != null) device.BindMaterialTable(currentMaterial);
     }
 
     // The actual comparer for states. This avoids us doing unecessary state changes.
