@@ -471,6 +471,16 @@ public class GLGraphicsDevice : Disposable, IGraphicsDevice
 
     }
 
+    public void BindMaterialTable(IMaterialTable materialTable)
+    {
+        GLMaterialTable table = (GLMaterialTable)materialTable;
+
+        for (uint i = 0; i < table.Textures.Length; i++)
+        {
+            BindImage(table.Textures[i], i);
+        }
+    }
+
     public unsafe void CopyBuffer(IBuffer bufSrc, IBuffer bufDst)
     {
         GLBuffer glSrc = (GLBuffer)bufSrc;
@@ -702,6 +712,18 @@ public class GLGraphicsDevice : Disposable, IGraphicsDevice
 
         return new GLGraphicsState(gl,programHandle,gfxDesc);
     }
+    public IMaterialTable CreateMaterialTable(IImage[] textures)
+    {
+        GLImage[] glTextures = new GLImage[textures.Length];
+
+        for (int i = 0; i < textures.Length; i++)
+        {
+            glTextures[i] = (GLImage)textures[i];
+        }
+
+        return new GLMaterialTable { Textures = glTextures };
+    }
+
     void BindReflectedSlots(uint programHandle, IShader shader)
     {
         if (shader == null)

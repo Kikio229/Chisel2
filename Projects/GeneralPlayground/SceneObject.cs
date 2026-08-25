@@ -3,8 +3,8 @@ using System;
 
 public class SceneObject
 {
-    public MeshBuffers Mesh;
-    public Texture2D Texture;
+    public MeshBuffers Mesh; 
+    public IMaterialTable Material;
     public Vector3 Position;
     public Vector3 Scale = Vector3.One;
 

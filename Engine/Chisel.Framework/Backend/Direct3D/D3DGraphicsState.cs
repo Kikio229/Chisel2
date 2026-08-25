@@ -1,5 +1,6 @@
 ﻿using Chisel.Resource;
 using System;
+using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using Vortice.Win32;
 using Vortice.Win32.Graphics.Direct3D;
@@ -14,6 +15,9 @@ internal class D3DGraphicsState : Disposable, IGraphicsState
     internal unsafe ID3D12PipelineState* PipelineState { get; set; }
     internal unsafe ID3D12RootSignature* RootSignature { get; set; }
     internal PrimitiveTopology Topology { get; }
+    public uint CbvCount { get; }
+    public uint SrvCount { get; }
+    public uint UavCount { get; }
 
     public unsafe D3DGraphicsState(ID3D12Device* device, D3DShader? vtxShader, D3DShader? pixShader, ImageFormat[]? colorFormats, ImageFormat? depthStencilFormat,
         GraphicsTopology topology, GraphicsDepthMode depthMode, GraphicsBlendMode blendMode, GraphicsCullMode cullMode, GraphicsFillMode fillMode,
@@ -22,12 +26,18 @@ internal class D3DGraphicsState : Disposable, IGraphicsState
         Topology = D3DUtilities.GetPrimitiveFromTopology(topology);
         colorFormats ??= new[] { ImageFormat.R8G8B8A8UNorm };
 
+        if(vtxShader != null && pixShader != null)
+        {
+            CbvCount = ComputeCbvCount(vtxShader.Reflection, pixShader.Reflection);
+            SrvCount = ComputeSrvCount(vtxShader.Reflection, pixShader.Reflection);
+            UavCount = 0;
+        }
+
         /* Root signature creation */
 
         // Both the DescriptorRanges and the RootParameter array they're
         // pointed at by must live for the whole D3D12SerializeRootSignature call below, so they're
-        // stackalloc'd right here in the constructor's own frame, not in a helper method whose frame
-        // would be gone by the time Serialize actually reads them.
+        // stackalloc'd right here in the constructor's own frame
         DescriptorRange* ranges = stackalloc DescriptorRange[4];
         RootParameter* parameters = stackalloc RootParameter[5];
         D3DUtilities.GetStaticRootParameters(parameters, ranges);
@@ -204,7 +214,67 @@ internal class D3DGraphicsState : Disposable, IGraphicsState
         PipelineState = pipeState;
         RootSignature = rootSig;
     }
+    static uint MaxRegisterPlusOne(IEnumerable<uint> slots)
+    {
+        uint max = 0;
+        bool any = false;
 
+        foreach (uint slot in slots)
+        {
+            any = true;
+
+            if (slot + 1 > max)
+            {
+                max = slot + 1;
+            }
+        }
+
+        return any ? max : 0;
+    }
+    static uint ComputeCbvCount(ShaderReflection vsRefl, ShaderReflection psRefl)
+    {
+        List<uint> slots = new List<uint>();
+
+        if (vsRefl != null)
+        {
+            foreach (ConstantBufferReflection cbuffer in vsRefl.ConstantBuffers)
+            {
+                slots.Add(cbuffer.Slot);
+            }
+        }
+
+        if (psRefl != null)
+        {
+            foreach (ConstantBufferReflection cbuffer in psRefl.ConstantBuffers)
+            {
+                slots.Add(cbuffer.Slot);
+            }
+        }
+
+        return MaxRegisterPlusOne(slots);
+    }
+    static uint ComputeSrvCount(ShaderReflection vsRefl, ShaderReflection psRefl)
+    {
+        List<uint> slots = new List<uint>();
+
+        if (vsRefl != null)
+        {
+            foreach (var slot in vsRefl.Samplers)
+            {
+                slots.Add(slot.Slot);
+            }
+        }
+
+        if (psRefl != null)
+        {
+            foreach (var slot in psRefl.Samplers)
+            {
+                slots.Add(slot.Slot);
+            }
+        }
+
+        return MaxRegisterPlusOne(slots);
+    }
     protected override unsafe void Dispose(bool disposing)
     {
         if (disposing)

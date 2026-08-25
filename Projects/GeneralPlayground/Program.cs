@@ -22,6 +22,9 @@ public class TestGame : Game
     Texture2D defaultNormal;
     ISampler sampler;
 
+    IMaterialTable faceMaterial;
+    IMaterialTable gridMaterial;
+
     RenderTarget2D screenTexture;
 
     // Camera state
@@ -56,6 +59,9 @@ public class TestGame : Game
 
         defaultSpecular = CreateFlatTexture(GraphicsDevice, 128, 128, 128, 0);
         defaultNormal = CreateFlatTexture(GraphicsDevice, 128, 128, 255, 255);
+
+        faceMaterial = GraphicsDevice.CreateMaterialTable(new IImage[] { face.Image, defaultSpecular.Image, defaultNormal.Image });
+        gridMaterial = GraphicsDevice.CreateMaterialTable(new IImage[] { grid.Image, defaultSpecular.Image, defaultNormal.Image });
 
         sampler = GraphicsDevice.CreateSampler(new SamplerDescription
         {
@@ -185,12 +191,9 @@ public class TestGame : Game
             modelShader.Parameters["Shininess"]?.SetValue(obj.Shininess);
             modelShader.Parameters["Transparent"]?.SetValue(obj.Transparent ? 1 : 0);
 
-            modelShader.Parameters["DiffuseTexture"].SetValue(obj.Texture);
-            modelShader.Parameters["SpecularTexture"]?.SetValue(defaultSpecular);
-            modelShader.Parameters["NormalTexture"]?.SetValue(defaultNormal);
-
             QuickDraw.BindVertexBuffer(obj.Mesh.Vertices);
             QuickDraw.BindIndexBuffer(obj.Mesh.Indices);
+            QuickDraw.SetMaterials(obj.Material);
             QuickDraw.DrawIndexed((uint)obj.Mesh.IndexCount);
         }
 
@@ -240,7 +243,7 @@ public class TestGame : Game
         sceneObjects.Add(new SceneObject
         {
             Mesh = groundMesh,
-            Texture = grid,
+            Material = gridMaterial,
             Position = new Vector3(0, -1.5f, 0),
             Scale = Vector3.One
         });
@@ -253,7 +256,7 @@ public class TestGame : Game
         sceneObjects.Add(new SceneObject
         {
             Mesh = cubeMesh,
-            Texture = face,
+            Material = faceMaterial,
             Position = Vector3.Zero,
             Scale = new Vector3(1.5f),
             SpinSpeed = 0.35f
@@ -269,7 +272,7 @@ public class TestGame : Game
             sceneObjects.Add(new SceneObject
             {
                 Mesh = sphereMesh,
-                Texture = grid,
+                Material = gridMaterial,
 
                 Position = new Vector3(
                     MathF.Cos(angle) * radius,
@@ -309,7 +312,7 @@ public class TestGame : Game
             sceneObjects.Add(new SceneObject
             {
                 Mesh = cubeMesh,
-                Texture = i % 5 == 0 ? face : grid,
+                Material = i % 5 == 0 ? faceMaterial : gridMaterial,
 
                 Position = new Vector3(
                     MathF.Cos(phase) * radius,
@@ -357,7 +360,7 @@ public class TestGame : Game
             sceneObjects.Add(new SceneObject
             {
                 Mesh = sphereMesh,
-                Texture = grid,
+                Material = gridMaterial,
 
                 Position = new Vector3(
                     MathF.Cos(phase) * radius,
@@ -410,7 +413,7 @@ public class TestGame : Game
             sceneObjects.Add(new SceneObject
             {
                 Mesh = cubeMesh,
-                Texture = i % 9 == 0 ? face : grid,
+                Material = i % 9 == 0 ? faceMaterial : gridMaterial,
 
                 Position = new Vector3(
                     MathF.Cos(phase) * radius,
@@ -470,7 +473,7 @@ public class TestGame : Game
             sceneObjects.Add(new SceneObject
             {
                 Mesh = i % 3 == 0 ? sphereMesh : cubeMesh,
-                Texture = i % 17 == 0 ? face : grid,
+                Material = i % 17 == 0 ? faceMaterial : gridMaterial,
 
                 Position = new Vector3(x, y, z),
 
@@ -517,7 +520,7 @@ public class TestGame : Game
             sceneObjects.Add(new SceneObject
             {
                 Mesh = cubeMesh,
-                Texture = i % 4 == 0 ? face : grid,
+                Material = i % 4 == 0 ? faceMaterial : gridMaterial,
 
                 Position = new Vector3(
                     MathF.Cos(phase) * radius,
@@ -579,7 +582,7 @@ public class TestGame : Game
                 sceneObjects.Add(new SceneObject
                 {
                     Mesh = y % 2 == 0 ? cubeMesh : sphereMesh,
-                    Texture = y % 5 == 0 ? face : grid,
+                    Material = y % 5 == 0 ? faceMaterial : gridMaterial,
 
                     Position = new Vector3(
                         towerX,
@@ -635,7 +638,7 @@ public class TestGame : Game
             sceneObjects.Add(new SceneObject
             {
                 Mesh = sphereMesh,
-                Texture = face,
+                Material = faceMaterial,
 
                 Position = new Vector3(
                     MathF.Cos(phase) * radius,
@@ -688,7 +691,7 @@ public class TestGame : Game
                 sceneObjects.Add(new SceneObject
                 {
                     Mesh = i % 4 == 0 ? sphereMesh : cubeMesh,
-                    Texture = i % 6 == 0 ? face : grid,
+                    Material = i % 6 == 0 ? faceMaterial : gridMaterial,
 
                     Position = new Vector3(
                         MathF.Cos(phase) * radius,
@@ -735,7 +738,7 @@ public class TestGame : Game
                 sceneObjects.Add(new SceneObject
                 {
                     Mesh = cubeMesh,
-                    Texture = strand == 0 ? face : grid,
+                    Material = strand == 0 ? faceMaterial : gridMaterial,
 
                     Position = new Vector3(
                         MathF.Cos(phase) * HelixRadius,

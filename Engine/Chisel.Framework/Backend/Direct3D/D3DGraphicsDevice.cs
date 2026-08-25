@@ -1,5 +1,4 @@
-﻿
-using Chisel.Resource;
+﻿using Chisel.Resource;
 using Hexa.NET.SDL3;
 using System;
 using System.Collections.Generic;
@@ -89,6 +88,12 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
     private uint _imageDescriptorCacheCursor;
     private const uint _imageDescriptorCacheCapacity = 512;
 
+    private readonly Dictionary<MaterialCacheKey, D3DMaterialTable> _materialTableCache = new();
+    private readonly List<D3DMaterialTable> _liveMaterialTables = new();
+    private uint _materialTableRegionStart;
+    private const uint _materialTableCapacity = 4096;
+    private uint _materialTableCursor;
+
     private uint _pendingSamplerMask;
     private readonly CpuDescriptorHandle[] _pendingSamplerWrites = new CpuDescriptorHandle[16];
     private bool _samplerTableCommitted;
@@ -117,7 +122,6 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
     private readonly CpuDescriptorHandle[] _singleRtvScratch = new CpuDescriptorHandle[1];
     private bool _hasDescriptorBlock;
 
-
     // DXGI
     private ComPtr<IDXGIFactory7> _factory;
     private ComPtr<IDXGIAdapter4> _adapter;
@@ -143,6 +147,8 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
     private ComPtr<IDXGIInfoQueue> _dxgiInfoQueue;
     private AutoResetEvent _mainFenceEvent, _uploadFenceEvent;
     private FeatureLevel _featLevel;
+
+    private bool _hasWarnedGrowthThisFrame;
 
     public unsafe D3DGraphicsDevice(bool debug)
     {
@@ -203,7 +209,8 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
         _cbvRegionStart = 0;
         _srvRegionStart = _cbvRegionStart + _maxFramesInFlight * _cbvFrameStride;
         _uavRegionStart = _srvRegionStart + _maxFramesInFlight * _srvFrameStride;
-        _resourceHeapCapacity = _uavRegionStart + _maxFramesInFlight * _uavFrameStride;
+        _materialTableRegionStart = _uavRegionStart + _maxFramesInFlight * _uavFrameStride;
+        _resourceHeapCapacity = _materialTableRegionStart + _materialTableCapacity;
     }
     private unsafe void GrowResourceHeap()
     {
@@ -229,6 +236,11 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
 
         _resourceHeap.Dispose();
         _resourceHeap = new D3DDescriptorHeap((ID3D12Device*)_device.Get(), DescriptorHeapType.CbvSrvUav, _resourceHeapCapacity, shaderVisible: true);
+
+        foreach (D3DMaterialTable table in _liveMaterialTables)
+        {
+            WriteMaterialTableDescriptors(table);
+        }
 
         Logger.AppendLog("D3D", $"Grew resource heap to {_drawsPerFrameCap} draws/frame.", ConsoleColor.Yellow, 1);
     }
@@ -258,6 +270,7 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
         _samplerBumpCursor = 0;
         _samplerTableReuseCache.Clear();
         _hasDescriptorBlock = false;
+        _hasWarnedGrowthThisFrame = false;
 
         _mainCmdAllocs[_frameIndex].Get()->Reset();
         _mainCmdList.Get()->Reset(_mainCmdAllocs[_frameIndex].Get(), null);
@@ -798,7 +811,7 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
         _pendingSamplerMask = 0;
         _samplerTableCommitted = false;
 
-        AllocDescriptorBlockForDraw();
+        AllocDescriptorBlockForDraw(state.CbvCount, state.SrvCount, state.UavCount);
 
         if (stateChanged)
         {
@@ -831,6 +844,11 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
         _mainCmdList.Get()->SetGraphicsRootDescriptorTable(_rootConstantBuffers, _resourceHeap.GetGpuAt(_currentCbvBase));
         _mainCmdList.Get()->SetGraphicsRootDescriptorTable(_rootShaderResources, _resourceHeap.GetGpuAt(_currentSrvBase));
         _mainCmdList.Get()->SetGraphicsRootDescriptorTable(_rootUnorderedAccess, _resourceHeap.GetGpuAt(_currentUavBase));
+    }
+    public unsafe void BindMaterialTable(IMaterialTable materialTable)
+    {
+        D3DMaterialTable table = (D3DMaterialTable)materialTable;
+        _mainCmdList.Get()->SetGraphicsRootDescriptorTable(_rootShaderResources, table.SrvTable);
     }
 
     public unsafe void UpdateBuffer(IBuffer buffer, ReadOnlySpan<byte> data, ulong offset)
@@ -1225,6 +1243,44 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
         D3DComputeState cmpState = new D3DComputeState((ID3D12Device*)_device.Get(), (D3DShader)cmpDesc.ComputeShader);
         return (IComputeState)cmpState;
     }
+    public unsafe IMaterialTable CreateMaterialTable(IImage[] textures)
+    {
+        MaterialCacheKey key = new MaterialCacheKey(textures);
+
+        if (_materialTableCache.TryGetValue(key, out D3DMaterialTable cached))
+        {
+            return cached;
+        }
+
+        D3DImage[] d3dTextures = new D3DImage[textures.Length];
+
+        for (int i = 0; i < textures.Length; i++)
+        {
+            d3dTextures[i] = (D3DImage)textures[i];
+        }
+
+        uint relativeSlot = AllocatePersistentSrvRange((uint)d3dTextures.Length);
+        D3DMaterialTable table = new D3DMaterialTable { RelativeSlot = relativeSlot, Textures = d3dTextures };
+        WriteMaterialTableDescriptors(table);
+
+        _materialTableCache[key] = table;
+        _liveMaterialTables.Add(table);
+
+        return table;
+    }
+    private unsafe void WriteMaterialTableDescriptors(D3DMaterialTable table)
+    {
+        uint baseSlot = _materialTableRegionStart + table.RelativeSlot;
+
+        for (int i = 0; i < table.Textures.Length; i++)
+        {
+            CpuDescriptorHandle src = GetOrCreateImageSrv(table.Textures[i]);
+            CpuDescriptorHandle dst = _resourceHeap.GetCpuAt(baseSlot + (uint)i);
+            _device.Get()->CopyDescriptorsSimple(1, dst, src, DescriptorHeapType.CbvSrvUav);
+        }
+
+        table.SrvTable = _resourceHeap.GetGpuAt(baseSlot);
+    }
 
     // Because some TWAT at microsoft decided they didnt want hardware implementations anymore...
     // We get to do it ourselves.
@@ -1508,18 +1564,20 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
 
         _mainCmdList.Get()->RSSetScissorRects(1, &rect);
     }
-
     private void AllocDescriptorBlockForDraw()
     {
         if (_cbvBumpCursor + _cbvRangeSize > _cbvFrameStride
             || _srvBumpCursor + _srvRangeSize > _srvFrameStride
             || _uavBumpCursor + _uavRangeSize > _uavFrameStride)
         {
-            Logger.AppendWarn(
-                $"Exceeded the per-frame resource descriptor budget ({_drawsPerFrameCap} draws) mid-frame - " +
-                "the draw count jumped by more than the proactive 75% check could catch between frames. " +
-                "Reusing the last descriptor block for the remainder of this frame's overflowing draws " +
-                "(they may show the wrong texture/transform for one frame) and growing aggressively for next frame.");
+            if (!_hasWarnedGrowthThisFrame)
+            {
+                Logger.AppendWarn(
+                    "Exceeded the per-frame resource descriptor budget mid-frame - " +
+                    "reusing the last descriptor block for the remainder of this frame's overflowing draws " +
+                    "and growing aggressively for next frame.");
+                _hasWarnedGrowthThisFrame = true;
+            }
 
             _cbvBumpCursor = _cbvFrameStride - _cbvRangeSize;
             _srvBumpCursor = _srvFrameStride - _srvRangeSize;
@@ -1540,6 +1598,43 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
         _cbvBumpCursor += _cbvRangeSize;
         _srvBumpCursor += _srvRangeSize;
         _uavBumpCursor += _uavRangeSize;
+
+        _hasDescriptorBlock = true;
+    }
+    private void AllocDescriptorBlockForDraw(uint cbvCount, uint srvCount, uint uavCount)
+    {
+        if (_cbvBumpCursor + cbvCount > _cbvFrameStride
+            || _srvBumpCursor + srvCount > _srvFrameStride
+            || _uavBumpCursor + uavCount > _uavFrameStride)
+        {
+            if (!_hasWarnedGrowthThisFrame)
+            {
+                Logger.AppendWarn(
+                    "Exceeded the per-frame resource descriptor budget mid-frame - " +
+                    "reusing the last descriptor block for the remainder of this frame's overflowing draws " +
+                    "and growing aggressively for next frame.");
+                _hasWarnedGrowthThisFrame = true;
+            }
+
+            _cbvBumpCursor = _cbvFrameStride - cbvCount;
+            _srvBumpCursor = _srvFrameStride - srvCount;
+            _uavBumpCursor = _uavFrameStride - uavCount;
+
+            _isPendingResourceHeapGrow = true;
+            _pendingDrawsPerFrameCap = Math.Max(_pendingDrawsPerFrameCap, _drawsPerFrameCap * 4);
+        }
+
+        uint frameCbvBase = _cbvRegionStart + _frameIndex * _cbvFrameStride;
+        uint frameSrvBase = _srvRegionStart + _frameIndex * _srvFrameStride;
+        uint frameUavBase = _uavRegionStart + _frameIndex * _uavFrameStride;
+
+        _currentCbvBase = frameCbvBase + _cbvBumpCursor;
+        _currentSrvBase = frameSrvBase + _srvBumpCursor;
+        _currentUavBase = frameUavBase + _uavBumpCursor;
+
+        _cbvBumpCursor += cbvCount;
+        _srvBumpCursor += srvCount;
+        _uavBumpCursor += uavCount;
 
         _hasDescriptorBlock = true;
     }
@@ -1758,6 +1853,19 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
         _device.Get()->CreateSampler(&desc, handle);
         _samplerCache[key] = handle;
         return handle;
+    }
+
+    private uint AllocatePersistentSrvRange(uint count)
+    {
+        if (_materialTableCursor + count > _materialTableCapacity)
+        {
+            throw new InvalidOperationException(
+                $"Exceeded the persistent material descriptor budget ({_materialTableCapacity} slots).");
+        }
+
+        uint relativeSlot = _materialTableCursor;
+        _materialTableCursor += count;
+        return relativeSlot;
     }
 
     #endregion

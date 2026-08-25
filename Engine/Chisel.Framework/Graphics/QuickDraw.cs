@@ -25,6 +25,7 @@ public static class QuickDraw
     // State
     static GraphicsStateDescription requestedState = new GraphicsStateDescription();
     static ShaderPass currentShader;
+    static IMaterialTable currentMaterial;
 
     // State cache, using a custom comparer to not mess with the barebones struct
     static Dictionary<GraphicsStateDescription, IGraphicsState> stateCache =
@@ -44,6 +45,10 @@ public static class QuickDraw
         currentShader = shader;
         requestedState.VertexShader = shader?.GetStage(ShaderStage.Vertex);
         requestedState.PixelShader = shader?.GetStage(ShaderStage.Pixel);
+    }
+    public static void SetMaterials(IMaterialTable table)
+    {
+        currentMaterial = table;
     }
 
     // Stateful functions
@@ -155,6 +160,7 @@ public static class QuickDraw
 
         device.BindGraphicsState(state);
         currentShader?.Apply();
+        device.BindMaterialTable(currentMaterial);
     }
 
     // The actual comparer for states. This avoids us doing unecessary state changes.

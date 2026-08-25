@@ -46,6 +46,7 @@ public interface IGraphicsDevice
     void BindSampler(ISampler sampler, uint slot);
     void BindGraphicsState(IGraphicsState gfxState);
     void BindComputeState(IComputeState cmpState);
+    void BindMaterialTable(IMaterialTable materialTable);
 
     void UpdateBuffer(IBuffer buffer, ReadOnlySpan<byte> data, ulong offset);
     (IBuffer arena, ulong offset) SuballocateBuffer(ReadOnlySpan<byte> data);
@@ -67,5 +68,6 @@ public interface IGraphicsDevice
     IRenderTarget CreateRenderTarget(RenderTargetDescription renDesc);
     IGraphicsState CreateGraphicsState(GraphicsStateDescription gfxDesc);
     IComputeState CreateComputeState(ComputeStateDescription cmpDesc);
+    IMaterialTable CreateMaterialTable(IImage[] textures);
     void GenerateMipmaps(IImage image, ReadOnlySpan<byte> baseLevelData);
 }

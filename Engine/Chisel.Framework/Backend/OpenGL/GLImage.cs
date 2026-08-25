@@ -6,7 +6,7 @@ using System.Text;
 using System.Threading.Tasks;
 
 namespace Chisel.Framework;
-internal class GLImage : Disposable, IImage
+public class GLImage : Disposable, IImage
 {
     public uint Width { get; }
     public uint Height { get; }

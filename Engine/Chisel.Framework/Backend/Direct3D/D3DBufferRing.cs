@@ -46,7 +46,7 @@ internal class D3DBufferRing : Disposable
 
         if (_pendingCap > Capacity)
         {
-            _arena?.Resource->Unmap(0, null);
+            _arena.Resource->Unmap(0, null);
             _arena?.Dispose();
             CreateArena(_pendingCap);
             _pendingCap = 0;
@@ -93,7 +93,7 @@ internal class D3DBufferRing : Disposable
     {
         if (disposing)
         {
-            _arena?.Resource->Unmap(0, null);
+            _arena.Resource->Unmap(0, null);
             _arena?.Dispose();
 
             foreach (D3DBuffer b in _overflow)
