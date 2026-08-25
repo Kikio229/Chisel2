@@ -24,8 +24,8 @@ public class UIManager
         root.CenterOffset.X = rectangle.Width / 2 + rectangle.X;
         root.CenterOffset.Y = rectangle.Height / 2 + rectangle.Y;
 
-        root.HalfExtents.X = rectangle.Width / 2;
-        root.HalfExtents.Y = rectangle.Height / 2;
+        root.HalfSizeOffset.X = rectangle.Width / 2;
+        root.HalfSizeOffset.Y = rectangle.Height / 2;
 
         root.Update(delta);
     }

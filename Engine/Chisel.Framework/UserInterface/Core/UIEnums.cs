@@ -10,4 +10,6 @@ public enum UIAnchor
     Left = 1 << 2,
     Right = 1 << 3,
     Bottom = 1 << 4,
+    FillH = 1 << 5,
+    FillV = 1 << 6,
 }

@@ -275,7 +275,16 @@ public class SpriteBatch : IDisposable
         if (currentClip.HasValue)
         {
             Rectangle clip = currentClip.Value;
-            device.SetScissor(new Vector2(clip.X, clip.Y), new Vector2(clip.Width, clip.Height));
+
+            if(device.Backend == GraphicsBackend.OpenGL46)
+            {
+                device.SetScissor(new Vector2(clip.X, Game.Instance!.Window.Resolution.H - clip.Y - clip.Height), new Vector2(clip.Width, clip.Height));
+            }
+            else
+            {
+                device.SetScissor(new Vector2(clip.X, clip.Y), new Vector2(clip.Width, clip.Height));
+            }
+
             device.SetScissorEnabled(true);
         }
         else

@@ -92,7 +92,7 @@ public class TestGame : Game
         uiManager.AddToRoot(new UIWindow("Test window",default)
         {
             Anchor = UIAnchor.Center,
-            HalfExtents = new(128),
+            HalfSizeOffset = new(200, 200),
             CenterOffset = new(0,0)
         });
 
@@ -275,6 +275,7 @@ public class TestGame : Game
         spriteBatch.End();
 
         uiManager.FrameRender((float)delta, spriteBatch, testUItex);
+        GraphicsDevice.SetScissorEnabled(false);
     }
     protected override void OnShutdown()
     {

@@ -39,7 +39,7 @@ public class UIRoot : UIObject
 
         CenterOffset.X = sizeX / 2f;
         CenterOffset.Y = sizeY / 2f;
-        HalfExtents.X = sizeX / 2f;
-        HalfExtents.Y = sizeY / 2f;
+        HalfSizeOffset.X = sizeX / 2f;
+        HalfSizeOffset.Y = sizeY / 2f;
     }
 }

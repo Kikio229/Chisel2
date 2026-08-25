@@ -1,11 +1,12 @@
-﻿using System;
+﻿using Chisel.Framework.UserInterface.Components;
+using System;
 
 namespace Chisel.Framework.UI;
 public class UIWindow : UIPanel
 {
     public string Title { get; private set; }
     public UIPanel InnerPanel { get; private set; }
-
+    public Vector2 MinSize { get; private set; } = new(128);
     public UIWindow(string title, UILayoutOptions options) : base(options)
     {
         this.Title = title;
@@ -18,6 +19,17 @@ public class UIWindow : UIPanel
         InnerPanel.Parent = this;
 
         Tint = new(140,140,140);
+
+        var btn = new UIButton(options)
+        {
+            HalfSizeOffset = new(16, 8),
+            CenterOffset = new(-12, 7),
+            Anchor = UIAnchor.Top | UIAnchor.Right,
+            Tint = Color.LightSalmon
+        };
+
+        Children.Add(btn);
+        btn.Parent = this;
     }
 
     public override Rectangle PanelRect => new(0,0,96,96);
@@ -39,30 +51,30 @@ public class UIWindow : UIPanel
     {
         base.OnRender(dt, batch, atlasTexture);
 
-        batch.DrawString(Title, 18, Position - HalfExtents + new Vector2(3), Color.Black, FontStashSharp.FontSystemEffect.Blurry, 3);
-        batch.DrawString(Title, 18, Position - HalfExtents + new Vector2(5), Color.White);
+        batch.DrawString(Title, 18, Position - HalfSize + new Vector2(8,3), Color.Black, FontStashSharp.FontSystemEffect.Blurry, 3);
+        batch.DrawString(Title, 18, Position - HalfSize + new Vector2(10,5), Color.White);
     }
     public override void OnUpdate(float dt)
     {
         base.OnUpdate(dt);
         ResizeContent();
         
-        var topCenter = Position - new Vector2(0, HalfExtents.Y);
-        var bottomCenter = Position + new Vector2(0, HalfExtents.Y);
-        var leftCenter = Position - new Vector2(HalfExtents.X, 0);
-        var rightCenter = Position + new Vector2(HalfExtents.X, 0);
+        var topCenter = Position - new Vector2(0, HalfSize.Y);
+        var bottomCenter = Position + new Vector2(0, HalfSize.Y);
+        var leftCenter = Position - new Vector2(HalfSize.X, 0);
+        var rightCenter = Position + new Vector2(HalfSize.X, 0);
 
         var tr = new Rectangle((int)rightCenter.X - 12, (int)topCenter.Y - 4, 16, 16);
         var tl = new Rectangle((int)leftCenter.X - 4, (int)topCenter.Y - 4, 16, 16);
         var br = new Rectangle((int)rightCenter.X - 12, (int)bottomCenter.Y - 12, 16, 16);
         var bl = new Rectangle((int)leftCenter.X - 4, (int)bottomCenter.Y - 12, 16, 16);
 
-        var l = new Rectangle((int)leftCenter.X, (int)leftCenter.Y - (int)HalfExtents.Y, 16, (int)HalfExtents.Y * 2);
-        var r = new Rectangle((int)rightCenter.X, (int)rightCenter.Y - (int)HalfExtents.Y, 16, (int)HalfExtents.Y * 2);
-        var t = new Rectangle((int)bottomCenter.X - (int)HalfExtents.X, (int)topCenter.Y - 4, (int)HalfExtents.X * 2, 16);
-        var b = new Rectangle((int)bottomCenter.X - (int)HalfExtents.X, (int)bottomCenter.Y - 12, (int)HalfExtents.X * 2, 16);
+        var l = new Rectangle((int)leftCenter.X, (int)leftCenter.Y - (int)HalfSize.Y, 16, (int)HalfSize.Y * 2);
+        var r = new Rectangle((int)rightCenter.X, (int)rightCenter.Y - (int)HalfSize.Y, 16, (int)HalfSize.Y * 2);
+        var t = new Rectangle((int)bottomCenter.X - (int)HalfSize.X, (int)topCenter.Y - 4, (int)HalfSize.X * 2, 16);
+        var b = new Rectangle((int)bottomCenter.X - (int)HalfSize.X, (int)bottomCenter.Y - 12, (int)HalfSize.X * 2, 16);
 
-        var titlebar = new Rectangle((int)bottomCenter.X - (int)HalfExtents.X, (int)topCenter.Y, (int)HalfExtents.X * 2, 30);
+        var titlebar = new Rectangle((int)bottomCenter.X - (int)HalfSize.X, (int)topCenter.Y, (int)HalfSize.X * 2, 30);
 
         bool mouseDown = InputManager.IsInputHeld(Input.MouseLeft);
 
@@ -70,7 +82,10 @@ public class UIWindow : UIPanel
         {
             if (!mouseDown) IsSizing = false;
 
-            if(Mode == SizeMode.Move)
+            Vector2 sizeChange = Vector2.Zero;
+            Vector2 posChange = Vector2.Zero;
+
+            if (Mode == SizeMode.Move)
             {
                 CenterOffset += InputManager.MouseDelta;
             }
@@ -78,25 +93,32 @@ public class UIWindow : UIPanel
             {
                 if (Mode.HasFlag(SizeMode.Right))
                 {
-                    HalfExtents.X += InputManager.MouseDelta.X / 2;
-                    CenterOffset.X += InputManager.MouseDelta.X / 2;
+                    sizeChange.X += InputManager.MouseDelta.X / 2;
+                    posChange.X = 1;
                 }
                 if (Mode.HasFlag(SizeMode.Left))
                 {
-                    HalfExtents.X -= InputManager.MouseDelta.X / 2;
-                    CenterOffset.X += InputManager.MouseDelta.X / 2;
+                    sizeChange.X -= InputManager.MouseDelta.X / 2;
+                    posChange.X = -1;
                 }
                 if (Mode.HasFlag(SizeMode.Bottom))
                 {
-                    HalfExtents.Y += InputManager.MouseDelta.Y / 2;
-                    CenterOffset.Y += InputManager.MouseDelta.Y / 2;
+                    sizeChange.Y += InputManager.MouseDelta.Y / 2;
+                    posChange.Y = 1;
                 }
                 if (Mode.HasFlag(SizeMode.Top))
                 {
-                    HalfExtents.Y -= InputManager.MouseDelta.Y / 2;
-                    CenterOffset.Y += InputManager.MouseDelta.Y / 2;
+                    sizeChange.Y -= InputManager.MouseDelta.Y / 2;
+                    posChange.Y = -1;
                 }
             }
+
+            sizeChange.X = float.Max(sizeChange.X, MinSize.X - HalfSize.X);
+            sizeChange.Y = float.Max(sizeChange.Y, MinSize.Y - HalfSize.Y);
+
+            HalfSizeOffset += sizeChange;
+            CenterOffset += posChange * sizeChange;
+
             ResizeContent();
 
             return;
@@ -199,10 +221,10 @@ public class UIWindow : UIPanel
     }
     void ResizeContent()
     {
-        var windowW = HalfExtents.X - 13;
-        var windowH = HalfExtents.Y - 22;
+        var windowW = HalfSizeOffset.X - 13;
+        var windowH = HalfSizeOffset.Y - 22;
 
-        InnerPanel.HalfExtents = new(windowW, windowH);
+        InnerPanel.HalfSizeOffset = new(windowW, windowH);
         InnerPanel.CenterOffset = new Vector2(0,8);
     }
 }

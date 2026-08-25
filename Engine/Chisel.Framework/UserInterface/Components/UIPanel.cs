@@ -29,34 +29,42 @@ public class UIPanel : UIObject
     public override void OnPrimaryClicked()
     {
     }
-
     public override void OnRender(float dt, SpriteBatch batch, Texture2D atlasTexture)
     {
-        int width = PanelRect.Width / 3;
-        int height = PanelRect.Height / 3;
+        int cornerW = PanelRect.Width / 3;
+        int cornerH = PanelRect.Height / 3;
 
-        int stretchPanelW = (int)(HalfExtents.X * 2 - width * 2);
-        int stretchPanelH = (int)(HalfExtents.Y * 2 - height * 2);
+        int srcMidW = PanelRect.Width - cornerW * 2;
+        int srcMidH = PanelRect.Height - cornerH * 2;
 
-        int xpos = (int)(Position.X - HalfExtents.X);
+        int[] srcX = { PanelRect.X, PanelRect.X + cornerW, PanelRect.X + PanelRect.Width - cornerW };
+        int[] srcY = { PanelRect.Y, PanelRect.Y + cornerH, PanelRect.Y + PanelRect.Height - cornerH };
+        int[] srcW = { cornerW, srcMidW, cornerW };
+        int[] srcH = { cornerH, srcMidH, cornerH };
 
+        int fullW = (int)(HalfSize.X * 2);
+        int fullH = (int)(HalfSize.Y * 2);
+
+        int destCornerW = Math.Min(cornerW, fullW / 2);
+        int destCornerH = Math.Min(cornerH, fullH / 2);
+
+        int[] dstW = { destCornerW, fullW - destCornerW * 2, destCornerW };
+        int[] dstH = { destCornerH, fullH - destCornerH * 2, destCornerH };
+
+        int xpos = (int)(Position.X - HalfSize.X);
         for (int x = 0; x < 3; x++)
         {
-            int ypos = (int)(Position.Y - HalfExtents.Y);
-
-            int curw = x == 1 ? stretchPanelW : width;
-
+            int ypos = (int)(Position.Y - HalfSize.Y);
             for (int y = 0; y < 3; y++)
             {
-                int curh = y == 1 ? stretchPanelH : height;
-
-                batch.Draw(atlasTexture, new(xpos, ypos), new(curw, curh), Tint, new(width * x + PanelRect.X, height * y + PanelRect.Y, width, height));
-
-                ypos += curh;
+                batch.Draw(atlasTexture, new(xpos, ypos), new(dstW[x], dstH[y]), Tint,
+                    new(srcX[x], srcY[y], srcW[x], srcH[y]));
+                ypos += dstH[y];
             }
-
-            xpos += curw;
+            xpos += dstW[x];
         }
+
+        //batch.SetClip(new((int)(Position.X - HalfSize.X), (int)(Position.Y - HalfSize.Y), fullW, fullH));
     }
     public override void OnUpdate(float dt)
     {

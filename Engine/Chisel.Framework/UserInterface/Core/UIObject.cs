@@ -8,7 +8,7 @@ public abstract class UIObject(UILayoutOptions options)
     public UIObject Parent;
     public List<UIObject> Children = [];
     public Vector2 CenterOffset;
-    public Vector2 HalfExtents;
+    public Vector2 HalfSizeOffset;
     public Color Tint = Color.White;
     public UIAnchor Anchor;
     public float RotationOffset;
@@ -51,28 +51,51 @@ public abstract class UIObject(UILayoutOptions options)
             var pPos = Parent.Position;
             var pUp = Parent.Up;
             var pRight = Parent.Right;
-            var pDim = Parent.HalfExtents;
+            var pDim = Parent.HalfSize;
 
             var localPos = CenterOffset;
 
             if (Anchor.HasFlag(UIAnchor.Left))
             {
-                localPos.X = -(pDim.X - HalfExtents.X) + CenterOffset.X;
+                localPos.X = -(pDim.X - HalfSize.X) + CenterOffset.X;
             }
             if (Anchor.HasFlag(UIAnchor.Right))
             {
-                localPos.X = (pDim.X - HalfExtents.X) + CenterOffset.X;
-            }
-            if (Anchor.HasFlag(UIAnchor.Bottom))
-            {
-                localPos.Y = -(pDim.Y - HalfExtents.Y) + CenterOffset.Y;
+                localPos.X = (pDim.X - HalfSize.X) + CenterOffset.X;
             }
             if (Anchor.HasFlag(UIAnchor.Top))
             {
-                localPos.Y = (pDim.Y - HalfExtents.Y) + CenterOffset.Y;
+                localPos.Y = -(pDim.Y - HalfSize.Y) + CenterOffset.Y;
+            }
+            if (Anchor.HasFlag(UIAnchor.Bottom))
+            {
+                localPos.Y = (pDim.Y - HalfSize.Y) + CenterOffset.Y;
             }
 
             return pRight * localPos.X + pUp * localPos.Y + pPos;
+        }
+    }
+    public Vector2 HalfSize
+    {
+        get
+        {
+            if (Parent == null) return HalfSizeOffset;
+
+            var pPos = Parent.Position;
+            var pDim = Parent.HalfSizeOffset;
+
+            var size = HalfSizeOffset;
+
+            if(Anchor.HasFlag(UIAnchor.FillH))
+            {
+                size.X = pDim.X + HalfSizeOffset.X;
+            }
+            if (Anchor.HasFlag(UIAnchor.FillV))
+            {
+                size.Y = pDim.Y + HalfSizeOffset.Y;
+            }
+
+            return size;
         }
     }
 
