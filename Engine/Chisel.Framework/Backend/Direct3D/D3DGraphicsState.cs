@@ -1,5 +1,4 @@
-﻿using Chisel.Resource;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using Vortice.Win32;
@@ -149,13 +148,13 @@ internal class D3DGraphicsState : Disposable, IGraphicsState
                             "input signature has no matching entry. VSInput fields must be declared in ascending [[vk::location(N)]] order.");
                     }
 
-                    VertexInputReflection semantic = vtxShader.Reflection.Inputs[attribute.Location];
-                    semanticNamePtrs[i] = Marshal.StringToHGlobalAnsi(semantic.SemanticName);
+                    InputReflection semantic = vtxShader.Reflection.Inputs[attribute.Location];
+                    semanticNamePtrs[i] = Marshal.StringToHGlobalAnsi(semantic.Name);
 
                     inputElements[i] = new InputElementDescription
                     {
                         SemanticName = (byte*)semanticNamePtrs[i],
-                        SemanticIndex = semantic.SemanticIndex,
+                        SemanticIndex = semantic.Index,
                         Format = D3DUtilities.GetDxgiFormatFromVertex(attribute.Format),
                         InputSlot = 0,
                         AlignedByteOffset = (uint)attribute.Offset,
@@ -231,21 +230,21 @@ internal class D3DGraphicsState : Disposable, IGraphicsState
 
         return any ? max : 0;
     }
-    static uint ComputeCbvCount(ShaderReflection vsRefl, ShaderReflection psRefl)
+    static uint ComputeCbvCount(ShaderReflection? vsRefl, ShaderReflection? psRefl)
     {
         List<uint> slots = new List<uint>();
 
         if (vsRefl != null)
         {
-            foreach (ConstantBufferReflection cbuffer in vsRefl.ConstantBuffers)
+            foreach (CbufferReflection c in vsRefl.Value.Cbuffers)
             {
-                slots.Add(cbuffer.Slot);
+                slots.Add(c.Slot);
             }
         }
 
         if (psRefl != null)
         {
-            foreach (ConstantBufferReflection cbuffer in psRefl.ConstantBuffers)
+            foreach (CbufferReflection cbuffer in psRefl.Value.Cbuffers)
             {
                 slots.Add(cbuffer.Slot);
             }
@@ -253,13 +252,13 @@ internal class D3DGraphicsState : Disposable, IGraphicsState
 
         return MaxRegisterPlusOne(slots);
     }
-    static uint ComputeSrvCount(ShaderReflection vsRefl, ShaderReflection psRefl)
+    static uint ComputeSrvCount(ShaderReflection? vsRefl, ShaderReflection? psRefl)
     {
         List<uint> slots = new List<uint>();
 
         if (vsRefl != null)
         {
-            foreach (var slot in vsRefl.Samplers)
+            foreach (var slot in vsRefl.Value.Samplers)
             {
                 slots.Add(slot.Slot);
             }
@@ -267,7 +266,7 @@ internal class D3DGraphicsState : Disposable, IGraphicsState
 
         if (psRefl != null)
         {
-            foreach (var slot in psRefl.Samplers)
+            foreach (var slot in psRefl.Value.Samplers)
             {
                 slots.Add(slot.Slot);
             }

@@ -1,11 +1,9 @@
-﻿using Chisel.Resource.Builder;
-using Chisel.Resource;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using Chisel.Framework;
+
 namespace Chisel.Resource.Builder;
 internal class AssetWalker
 {
@@ -80,7 +78,7 @@ internal class AssetWalker
         {
             string pakPath = Path.Combine(outputDirectory, "assets.cpk");
             Directory.CreateDirectory(outputDirectory);
-            PakWriter.Write(pakPath, packedEntries);
+            PackFileWriter.Write(pakPath, packedEntries);
             expectedOutputs.Add("assets.cpk");
         }
 

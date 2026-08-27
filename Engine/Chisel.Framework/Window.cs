@@ -1,5 +1,4 @@
 ﻿using Chisel.Framework.Utilities;
-using Chisel.Resource;
 using Hexa.NET.SDL3;
 using System;
 using System.Runtime.InteropServices;
@@ -47,7 +46,7 @@ public class Window : Disposable
     public CursorMode CursorMode { get; private set; }
     public bool IsFocused { get; private set; } = true;
 
-    public GraphicsBackend Backend { get; set; } = GraphicsBackend.Direct3D12;
+    public GraphicsBackend Backend { get; set; } = GraphicsBackend.Direct3D;
 
     // GL is weird and has to know it's allowed here before anything
     public unsafe SDLGLContext GLContext { get; private set; }
@@ -105,10 +104,10 @@ public class Window : Disposable
             throw new ArgumentException($"Unknown CHISEL_FORCE_BACKEND value: '{forced}'");
         }
 #if WINDOWS
-        return GraphicsBackend.Direct3D12;
+        return GraphicsBackend.Direct3D;
 #endif
         // Good fallback.
-        return GraphicsBackend.OpenGL46;
+        return GraphicsBackend.OpenGL;
     }
 
     public unsafe void InitAndRun()
@@ -123,7 +122,7 @@ public class Window : Disposable
         }
 
         // GL has to init BEFORE the window
-        if (Backend == GraphicsBackend.OpenGL46)
+        if (Backend == GraphicsBackend.OpenGL)
         {
             SDL.GLSetAttribute(SDLGLAttr.ContextProfileMask, 0x0001); // Core
             SDL.GLSetAttribute(SDLGLAttr.ContextMajorVersion, 4);
@@ -142,7 +141,7 @@ public class Window : Disposable
 
         Handle = SDL.CreateWindow(Title, Resolution.W, Resolution.H, (uint)flags);
 
-        if (Backend == GraphicsBackend.OpenGL46)
+        if (Backend == GraphicsBackend.OpenGL)
         {
             GLContext = SDL.GLCreateContext(Handle);
             SDL.GLMakeCurrent(Handle, GLContext);

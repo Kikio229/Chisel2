@@ -1,9 +1,8 @@
-﻿using Chisel.Resource;
-using Hexa.NET.SDL3;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Threading;
+using Hexa.NET.SDL3;
 using Vortice.Win32;
 using Vortice.Win32.Graphics.D3D12MemoryAllocator;
 using Vortice.Win32.Graphics.Direct3D;
@@ -22,7 +21,7 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
     public uint FrameIndex => _frameIndex;
     public uint SampleCount => _sampleCount;
     public uint BufferingCount => _maxFramesInFlight;
-    public GraphicsBackend Backend => GraphicsBackend.Direct3D12;
+    public GraphicsBackend Backend => GraphicsBackend.Direct3D;
     public ImageFormat[] ColorFormats => _colorFormats;
     public ImageFormat? DepthStencilFormat => _depthStencilFormat;
 
@@ -1125,7 +1124,7 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
             throw new ArgumentOutOfRangeException(nameof(shdDesc), shdDesc.Stage, "Shader stage is unknown or invalid!");
         }
 
-        D3DShader shader = new D3DShader(shdDesc.Entry, shdDesc.Stage, shdDesc.Reflection, shdDesc.Bytecode.ToArray());
+        D3DShader shader = new D3DShader(shdDesc.Entry, shdDesc.Stage, shdDesc.Reflection!.Value, shdDesc.Bytecode.ToArray());
         return (IShader)shader;
     }
 

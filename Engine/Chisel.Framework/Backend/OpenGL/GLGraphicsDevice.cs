@@ -1,11 +1,8 @@
-﻿
-using Chisel.Resource;
+﻿using System;
+using System.Collections.Generic;
+using System.Runtime.InteropServices;
 using Hexa.NET.SDL3;
 using Silk.NET.OpenGL;
-using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.Runtime.InteropServices;
 
 namespace Chisel.Framework;
 
@@ -20,7 +17,7 @@ public class GLGraphicsDevice : Disposable, IGraphicsDevice
     static extern nint GetProcAddress(nint module, string procName);
 #endif
 
-    public GraphicsBackend Backend => GraphicsBackend.OpenGL46; 
+    public GraphicsBackend Backend => GraphicsBackend.OpenGL; 
     // this doesnt really matter on GL
     public uint FrameIndex => 0;
     public uint BufferingCount => 2;
@@ -639,7 +636,7 @@ public class GLGraphicsDevice : Disposable, IGraphicsDevice
             throw new InvalidOperationException("Failed to compile GL shader: " + log);
         }
 
-        return new GLShader(gl,shdDesc.Entry,shdDesc.Stage,shdDesc.Reflection,handle);
+        return new GLShader(gl,shdDesc.Entry,shdDesc.Stage, shdDesc.Reflection!.Value, handle);
     }
 
     public unsafe IRenderTarget CreateRenderTarget(RenderTargetDescription renDesc)
@@ -734,7 +731,7 @@ public class GLGraphicsDevice : Disposable, IGraphicsDevice
         ShaderReflection reflection = shader.Reflection;
 
         // We have to kinda hack the uniforms
-        foreach (ConstantBufferReflection cbuffer in reflection.ConstantBuffers)
+        foreach (CbufferReflection cbuffer in reflection.Cbuffers)
         {
             uint blockIndex = gl.GetUniformBlockIndex(programHandle, cbuffer.Name);
 
@@ -782,7 +779,7 @@ public class GLGraphicsDevice : Disposable, IGraphicsDevice
 
     protected override unsafe void Dispose(bool disposing)
     {
-        if (Backend == GraphicsBackend.OpenGL46)
+        if (Backend == GraphicsBackend.OpenGL)
         {
             SDL.GLDestroyContext(glCTX);
         }

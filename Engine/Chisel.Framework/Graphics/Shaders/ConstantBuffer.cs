@@ -1,5 +1,4 @@
-﻿using Chisel.Resource;
-using System;
+﻿using System;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
@@ -35,7 +34,7 @@ public class ConstantBuffer : IDisposable
         GraphicsDevice = device;
         data = new byte[sizeInBytes];
 
-        useArena = device.Backend == GraphicsBackend.Direct3D12;
+        useArena = device.Backend == GraphicsBackend.Direct3D;
 
         if (useArena)
         {

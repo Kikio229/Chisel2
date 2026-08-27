@@ -1,5 +1,4 @@
-﻿using Chisel.Resource;
-using System;
+﻿using System;
 using System.IO;
 using System.Threading.Tasks;
 
@@ -63,26 +62,26 @@ public class Game
 
         switch (Window.Backend)
         {
-            case GraphicsBackend.OpenGL46:
+            case GraphicsBackend.OpenGL:
                 GraphicsDevice = new GLGraphicsDevice(Window.GLContext, _isDebug);
                 break;
-            case GraphicsBackend.Direct3D12:
+            case GraphicsBackend.Direct3D:
                 GraphicsDevice = new D3DGraphicsDevice(_isDebug);
                 break;
         }
 
         // Detect if we're using .cpk or not
         bool isPacked = File.Exists(Path.Combine(AppContext.BaseDirectory, "Content", "assets.cpk"));
-        IContentSource mainSrc = isPacked ?
-            new PackedContentSource(Path.Combine(AppContext.BaseDirectory, "Content", "assets.cpk")) :
-            new LooseContentSource(Path.Combine(AppContext.BaseDirectory, "Content"));
+        ISource mainSrc = isPacked ?
+            new PackedSource(Path.Combine(AppContext.BaseDirectory, "Content", "assets.cpk")) :
+            new LooseSource(Path.Combine(AppContext.BaseDirectory, "Content"));
 
         Content = new ContentManager(
-            new MergedContentSource(new LooseContentSource(Path.Combine(AppContext.BaseDirectory, "Mods")), mainSrc), GraphicsDevice);
+            new MergedSource(new LooseSource(Path.Combine(AppContext.BaseDirectory, "Mods")), mainSrc));
 
         Content.RegisterLoader(new ShaderPassLoader(GraphicsDevice));
         Content.RegisterLoader(new ShaderEffectLoader(GraphicsDevice));
-        Content.RegisterLoader(new TextureContentLoader(GraphicsDevice));
+        Content.RegisterLoader(new TextureLoader(GraphicsDevice));
 
         // Init QuickDraw
         QuickDraw.Init(GraphicsDevice);

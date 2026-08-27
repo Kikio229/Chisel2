@@ -1,23 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Text;
 
-namespace Chisel.Resource;
-
-public enum AssetType
-{
-    Texture,
-    Shader,
-    Model,
-    Sound,
-    Copy,
-    None,
-}
+namespace Chisel.Framework;
 
 public static class AssetTypeMap
 {
-    static readonly Dictionary<string, AssetType> extensionsMap = new Dictionary<string, AssetType>()
-    {
+    private static readonly Dictionary<string, AssetType> _extMap = new Dictionary<string, AssetType>() {
         [".png"] = AssetType.Texture,
         [".jpg"] = AssetType.Texture,
         [".dds"] = AssetType.Texture,
@@ -41,7 +29,7 @@ public static class AssetTypeMap
 
     public static AssetType Resolve(string extension)
     {
-        if (extensionsMap.TryGetValue(extension, out var type)) return type;
+        if (_extMap.TryGetValue(extension, out var type)) return type;
         return AssetType.None;
     }
 }

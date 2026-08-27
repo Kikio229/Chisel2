@@ -1,6 +1,9 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
+using Chisel.Framework;
 
 namespace Chisel.Resource.Builder;
+
 static class AssetHandlerRegistry
 {
     static readonly Dictionary<AssetType, IAssetHandler> handlers = new Dictionary<AssetType, IAssetHandler>

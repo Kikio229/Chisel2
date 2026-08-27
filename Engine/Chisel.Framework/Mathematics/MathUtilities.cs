@@ -34,6 +34,9 @@ public static class MathUtilities
     internal static bool X86SimdSupported = Avx.IsSupported;
     internal static bool ArmSimdSupported = false; // Maybe...
 
+    // These are all just a convenience wrappers over Math and MathF.
+    // Trust me, typing MathF over and over gets kind of annoying after a while
+
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static float Abs(this float value) => MathF.Abs(value);
 
@@ -137,86 +140,41 @@ public static class MathUtilities
     public static double Tan(this double value) => Math.Tan(value);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static int Clamp(this int value, int min, int max)
-    {
-        value = (value > max) ? max : value;
-        value = (value < min) ? min : value;
-        return value;
-    }
+    public static int Clamp(this int value, int min, int max) => Math.Clamp(value, min, max);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static float Clamp(this float value, float min, float max)
-    {
-        value = (value > max) ? max : value;
-        value = (value < min) ? min : value;
-        return value;
-    }
+    public static float Clamp(this float value, float min, float max) => Math.Clamp(value, min, max);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static double Clamp(this double value, double min, double max)
-    {
-        value = (value > max) ? max : value;
-        value = (value < min) ? min : value;
-        return value;
-    }
+    public static double Clamp(this double value, double min, double max) => Math.Clamp(value, min, max);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static float Distance(this float value, float other)
-    {
-        return MathF.Abs(value - other);
-    }
+    public static float Round(this float value) => MathF.Round(value);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static double Distance(this double value, double other)
-    {
-        return Math.Abs(value - other);
-    }
+    public static double Round(this double value) => Math.Round(value);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static float Lerp(this float from, float to, float amount)
-    {
-        return from + (to - from) * amount;
-    }
+    public static float Lerp(this float from, float to, float amount) => float.Lerp(from, to, amount);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static double Lerp(this double from, double to, double amount)
-    {
-        return from + (to - from) * amount;
-    }
+    public static double Lerp(this double from, double to, double amount) => double.Lerp(from, to, amount);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static int Min(this int value, int other)
-    {
-        return value < other ? value : other;
-    }
+    public static int Min(this int value, int other) => Math.Min(value, other);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static float Min(this float value, float other)
-    {
-        return value < other ? value : other;
-    }
+    public static float Min(this float value, float other) => Math.Min(value, other);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static double Min(this double value, double other)
-    {
-        return value < other ? value : other;
-    }
+    public static double Min(this double value, double other) => Math.Min(value, other);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static int Max(this int value, int other)
-    {
-        return value > other ? value : other;
-    }
+    public static int Max(this int value, int other) => Math.Max(value, other);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static float Max(this float value, float other)
-    {
-        return value > other ? value : other;
-    }
+    public static float Max(this float value, float other) => Math.Max(other, value);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static double Max(this double value, double other)
-    {
-        return value > other ? value : other;
-    }
+    public static double Max(this double value, double other) => Math.Max(other, value);
 }

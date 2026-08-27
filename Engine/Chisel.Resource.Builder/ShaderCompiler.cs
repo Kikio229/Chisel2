@@ -1,4 +1,4 @@
-﻿using Chisel.Resource;
+﻿using Chisel.Framework;
 
 namespace Chisel.Resource.Builder;
 

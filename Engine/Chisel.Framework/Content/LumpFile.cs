@@ -1,11 +1,11 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Text;
 using System.IO;
 
-namespace Chisel.Resource;
+namespace Chisel.Framework;
 
-static class LumpFile
+internal static class LumpFile
 {
     public static byte[] Write(uint magic, byte version, List<(string Name, byte[] Data)> lumps)
     {
@@ -20,9 +20,9 @@ static class LumpFile
         List<long> patchPositions = new List<long>();
 
         // We'll make the "placeholder" TOC here:
-        foreach((string name, byte[] data) in lumps)
+        foreach ((string n, byte[] d) in lumps)
         {
-            WriteString(w, name);
+            WriteString(w, n);
             patchPositions.Add(ms.Position);
             w.Write(0);
             w.Write(0);
@@ -31,7 +31,7 @@ static class LumpFile
         // and now we'll write the actual data
         int[] offsets = new int[lumps.Count];
 
-        for(int i = 0; i < lumps.Count; i ++)
+        for (int i = 0; i < lumps.Count; i++)
         {
             offsets[i] = (int)ms.Position;
             w.Write(lumps[i].Data);
@@ -40,7 +40,7 @@ static class LumpFile
         // Now, we'll go fill in that TOC
         for (int i = 0; i < lumps.Count; i++)
         {
-            ms.Seek(patchPositions[i],SeekOrigin.Begin);
+            ms.Seek(patchPositions[i], SeekOrigin.Begin);
             w.Write(offsets[i]);
             w.Write(lumps[i].Data.Length);
         }
@@ -48,7 +48,7 @@ static class LumpFile
         return ms.ToArray();
     }
 
-    public static Dictionary<string,(int Offset, int Length)> ReadDirectory(BinaryReader r, out uint magic, out byte version)
+    public static Dictionary<string, (int Offset, int Length)> ReadDirectory(BinaryReader r, out uint magic, out byte version)
     {
         magic = r.ReadUInt32();
         version = r.ReadByte();

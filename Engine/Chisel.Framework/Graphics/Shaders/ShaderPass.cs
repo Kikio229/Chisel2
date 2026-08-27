@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using Chisel.Resource;
 
 namespace Chisel.Framework;
 public class ShaderPass : IDisposable
@@ -28,14 +27,14 @@ public class ShaderPass : IDisposable
 
         foreach (IShader stage in stages)
         {
-            foreach (ConstantBufferReflection cbuffer in stage.Reflection.ConstantBuffers)
+            foreach (CbufferReflection cbuffer in stage.Reflection.Cbuffers)
             {
                 if (!buffersByName.TryGetValue(cbuffer.Name, out ConstantBuffer buffer))
                 {
                     buffer = new ConstantBuffer(cbuffer.Name, cbuffer.Slot, cbuffer.SizeInBytes, device);
                     buffersByName.Add(cbuffer.Name, buffer);
 
-                    foreach (ConstantBufferMemberReflection member in cbuffer.Members)
+                    foreach (MemberReflection member in cbuffer.Members)
                     {
                         Parameters.Add(new ShaderParameter(member.Name, buffer, member.Offset));
                     }

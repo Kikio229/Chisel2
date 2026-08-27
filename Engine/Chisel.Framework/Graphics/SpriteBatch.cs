@@ -1,6 +1,5 @@
 ﻿using Chisel.Framework;
 using Chisel.Framework.UI;
-using Chisel.Resource;
 using FontStashSharp;
 using Silk.NET.OpenGL;
 using System;
@@ -150,7 +149,7 @@ public class SpriteBatch : IDisposable
         Vector2 uvMin = Vector2.Zero;
         Vector2 uvMax = Vector2.One;
 
-        if (device.Backend == GraphicsBackend.OpenGL46)
+        if (device.Backend == GraphicsBackend.OpenGL)
         {
             // GL rasterizes into an FBO with the opposite row order D3D does, relative to
             // clip space. Sampling it with the same UVs as a loaded texture comes out
@@ -276,7 +275,7 @@ public class SpriteBatch : IDisposable
         {
             Rectangle clip = currentClip.Value;
 
-            if(device.Backend == GraphicsBackend.OpenGL46)
+            if(device.Backend == GraphicsBackend.OpenGL)
             {
                 device.SetScissor(new Vector2(clip.X, Game.Instance!.Window.Resolution.H - clip.Y - clip.Height), new Vector2(clip.Width, clip.Height));
             }

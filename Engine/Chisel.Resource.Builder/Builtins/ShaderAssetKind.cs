@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using System.Threading.Tasks;
+using Chisel.Framework;
 
 namespace Chisel.Resource.Builder;
 public class ShaderAssetKind : IBuiltInAssetKind
@@ -21,6 +21,6 @@ public class ShaderAssetKind : IBuiltInAssetKind
     }
     public string GetOutputPath(string name)
     {
-        return ContentPath.Normalize("Shaders/" + name + "." + ShaderContentInfo.FileExtension);
+        return ContentPath.Normalize("Shaders/" + name + "." + ShaderLoader.FileExtension);
     }
 }

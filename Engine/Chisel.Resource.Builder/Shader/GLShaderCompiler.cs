@@ -1,9 +1,10 @@
-﻿using Chisel.Resource;
+﻿
 using Silk.NET.SPIRV;
 using Silk.NET.SPIRV.Cross;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using Chisel.Framework;
 
 namespace Chisel.Resource.Builder;
 
@@ -11,7 +12,7 @@ unsafe class GLShaderCompiler : IShaderCompiler
 {
     static Cross api = Cross.GetApi();
 
-    public GraphicsBackend Backend => GraphicsBackend.OpenGL46;
+    public GraphicsBackend Backend => GraphicsBackend.OpenGL;
 
     const bool DumpShaders = false;
 
@@ -89,7 +90,7 @@ unsafe class GLShaderCompiler : IShaderCompiler
         Silk.NET.SPIRV.Cross.Resources* resources;
         api.CompilerCreateShaderResources(compiler, &resources);
 
-        List<ConstantBufferReflection> constantBuffers = new List<ConstantBufferReflection>();
+        List<CbufferReflection> constantBuffers = new List<CbufferReflection>();
         List<ResourceReflection> images = new List<ResourceReflection>();
         List<ResourceReflection> samplers = new List<ResourceReflection>();
 
@@ -108,7 +109,7 @@ unsafe class GLShaderCompiler : IShaderCompiler
             nuint structSize;
             api.CompilerGetDeclaredStructSize(compiler, structType, &structSize);
 
-            List<ConstantBufferMemberReflection> members = new List<ConstantBufferMemberReflection>();
+            List<MemberReflection> members = new List<MemberReflection>();
 
             for (uint m = 0; m < memberCount; m++)
             {
@@ -116,14 +117,14 @@ unsafe class GLShaderCompiler : IShaderCompiler
                 uint offset;
                 api.CompilerTypeStructMemberOffset(compiler, structType, m, &offset);
 
-                members.Add(new ConstantBufferMemberReflection
+                members.Add(new MemberReflection
                 {
                     Name = new string((sbyte*)memberName),
                     Offset = (int)offset,
                 });
             }
 
-            constantBuffers.Add(new ConstantBufferReflection
+            constantBuffers.Add(new CbufferReflection
             {
                 Name = new string((sbyte*)resource.Name),
                 Slot = slot,
@@ -154,7 +155,7 @@ unsafe class GLShaderCompiler : IShaderCompiler
 
         return new ShaderReflection
         {
-            ConstantBuffers = constantBuffers.ToArray(),
+            Cbuffers = constantBuffers.ToArray(),
             Images = images.ToArray(),
             Samplers = samplers.ToArray(),
         };

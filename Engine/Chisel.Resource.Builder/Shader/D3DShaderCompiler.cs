@@ -1,14 +1,11 @@
-﻿using Chisel.Resource;
+﻿
 using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using Chisel.Framework;
 
 namespace Chisel.Resource.Builder;
 class D3DShaderCompiler : IShaderCompiler
 {
-    public GraphicsBackend Backend => GraphicsBackend.Direct3D12;
+    public GraphicsBackend Backend => GraphicsBackend.Direct3D;
 
     public (byte[] Bytecode, ShaderReflection Reflection) Compile(string source, string entry, ShaderStage stage)
     {

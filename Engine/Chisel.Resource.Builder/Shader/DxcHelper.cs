@@ -1,8 +1,8 @@
-﻿using Chisel.Resource;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Text;
+using Chisel.Framework;
 using Vortice.Win32;
 using Vortice.Win32.Graphics.Direct3D;
 using Vortice.Win32.Graphics.Direct3D.Dxc;
@@ -138,13 +138,13 @@ static unsafe class DxcHelper
             }
         }
 
-        ShaderDescription desc;
+        Vortice.Win32.Graphics.Direct3D12.ShaderDescription desc;
         shaderReflection->GetDesc(&desc);
 
-        List<ConstantBufferReflection> constantBuffers = new List<ConstantBufferReflection>();
+        List<CbufferReflection> constantBuffers = new List<CbufferReflection>();
         List<ResourceReflection> images = new List<ResourceReflection>();
         List<ResourceReflection> samplers = new List<ResourceReflection>();
-        List<VertexInputReflection> inputs = new List<VertexInputReflection>();
+        List<InputReflection> inputs = new List<InputReflection>();
 
         for (uint i = 0; i < desc.BoundResources; i++)
         {
@@ -160,7 +160,7 @@ static unsafe class DxcHelper
                     ShaderBufferDescription cbDesc;
                     cb->GetDesc(&cbDesc);
 
-                    List<ConstantBufferMemberReflection> members = new List<ConstantBufferMemberReflection>();
+                    List<MemberReflection> members = new List<MemberReflection>();
 
                     for (uint v = 0; v < cbDesc.Variables; v++)
                     {
@@ -168,7 +168,7 @@ static unsafe class DxcHelper
                         ShaderVariableDescription varDesc;
                         variable->GetDesc(&varDesc);
 
-                        members.Add(new ConstantBufferMemberReflection
+                        members.Add(new MemberReflection
                         {
                             Name = new string((sbyte*)varDesc.Name),
                             Offset = (int)varDesc.StartOffset,
@@ -176,7 +176,7 @@ static unsafe class DxcHelper
                         });
                     }
 
-                    constantBuffers.Add(new ConstantBufferReflection
+                    constantBuffers.Add(new CbufferReflection
                     {
                         Name = name,
                         Slot = bindDesc.BindPoint,
@@ -202,10 +202,10 @@ static unsafe class DxcHelper
                 SignatureParameterDescription paramDesc;
                 shaderReflection->GetInputParameterDesc(i, &paramDesc);
 
-                inputs.Add(new VertexInputReflection
+                inputs.Add(new InputReflection
                 {
-                    SemanticName = new string((sbyte*)paramDesc.SemanticName),
-                    SemanticIndex = paramDesc.SemanticIndex,
+                    Name = new string((sbyte*)paramDesc.SemanticName),
+                    Index = paramDesc.SemanticIndex,
                 });
             }
         }
@@ -215,7 +215,7 @@ static unsafe class DxcHelper
 
         return new ShaderReflection
         {
-            ConstantBuffers = constantBuffers.ToArray(),
+            Cbuffers = constantBuffers.ToArray(),
             Images = images.ToArray(),
             Samplers = samplers.ToArray(),
             Inputs = inputs.ToArray(),

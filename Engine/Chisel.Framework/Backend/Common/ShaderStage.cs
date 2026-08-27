@@ -1,8 +1,6 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Text;
 
-namespace Chisel.Resource;
+namespace Chisel.Framework;
 
 // We'll make these flags so that we can actually have params for multiple at once
 [Flags]

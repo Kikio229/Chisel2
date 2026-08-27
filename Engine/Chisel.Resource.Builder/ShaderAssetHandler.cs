@@ -1,15 +1,14 @@
-﻿using Chisel.Resource.Builder;
-using Chisel.Resource;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text.RegularExpressions;
+using Chisel.Framework;
 
 namespace Chisel.Resource.Builder;
 
 class ShaderAssetHandler : IAssetHandler
 {
-    public string OutputExtension => ShaderContentInfo.FileExtension;
+    public string OutputExtension => ShaderLoader.FileExtension;
 
     IShaderCompiler[] compilers;
 
@@ -62,7 +61,7 @@ class ShaderAssetHandler : IAssetHandler
         }
         string compileSource = StripTechniqueDirectives(source);
 
-        List<ShaderVariantEntry> headers = new List<ShaderVariantEntry>();
+        List<ShaderEntry> headers = new List<ShaderEntry>();
         List<byte[]> bytecodeBlobs = new List<byte[]>();
         List<byte[]> reflectionBlobs = new List<byte[]>();
 
@@ -76,7 +75,7 @@ class ShaderAssetHandler : IAssetHandler
                 using BinaryWriter reflectionWriter = new BinaryWriter(reflectionStream);
                 ShaderReflectionSerializer.Write(reflectionWriter, reflection);
 
-                headers.Add(new ShaderVariantEntry
+                headers.Add(new ShaderEntry
                 {
                     Technique = technique,
                     Backend = compiler.Backend,
