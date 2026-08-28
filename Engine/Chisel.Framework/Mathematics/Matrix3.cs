@@ -181,17 +181,17 @@ public struct Matrix3 : IEquatable<Matrix3>, IFormattable
 
     public override readonly int GetHashCode()
     {
-        Hasher hasher = new Hasher();
-        hasher.Add(M11);
-        hasher.Add(M12);
-        hasher.Add(M13);
-        hasher.Add(M21);
-        hasher.Add(M22);
-        hasher.Add(M23);
-        hasher.Add(M31);
-        hasher.Add(M32);
-        hasher.Add(M33);
-        return (int)hasher.Finalize32();
+        HashCode hash = new HashCode();
+        hash.Add(M11);
+        hash.Add(M12);
+        hash.Add(M13);
+        hash.Add(M21);
+        hash.Add(M22);
+        hash.Add(M23);
+        hash.Add(M31);
+        hash.Add(M32);
+        hash.Add(M33);
+        return hash.ToHashCode();
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

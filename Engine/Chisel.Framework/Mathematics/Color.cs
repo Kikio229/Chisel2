@@ -233,9 +233,7 @@ public struct Color : IEquatable<Color>, IFormattable
 
     public override readonly int GetHashCode()
     {
-        Hasher hasher = new Hasher();
-        hasher.Add(_value);
-        return (int)hasher.Finalize32();
+        return _value.GetHashCode();
     }
 
     public override string ToString()

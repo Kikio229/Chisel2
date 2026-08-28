@@ -128,12 +128,7 @@ public struct Rectangle : IEquatable<Rectangle>, IFormattable
 
     public override readonly int GetHashCode()
     {
-        Hasher hasher = new Hasher();
-        hasher.Add(X);
-        hasher.Add(Y);
-        hasher.Add(Width);
-        hasher.Add(Height);
-        return (int)hasher.Finalize32();
+        return X.GetHashCode() ^ Y.GetHashCode() ^ Width.GetHashCode() ^ Height.GetHashCode();
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

@@ -52,10 +52,7 @@ public struct Point : IEquatable<Point>, IFormattable
 
     public override readonly int GetHashCode()
     {
-        Hasher hasher = new Hasher();
-        hasher.Add(X);
-        hasher.Add(Y);
-        return (int)hasher.Finalize32();
+        return X.GetHashCode() ^ Y.GetHashCode();
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

@@ -768,24 +768,24 @@ public struct Matrix4 : IEquatable<Matrix4>, IFormattable
 
     public override readonly int GetHashCode()
     {
-        Hasher hasher = new Hasher();
-        hasher.Add(M11);
-        hasher.Add(M12);
-        hasher.Add(M13);
-        hasher.Add(M14);
-        hasher.Add(M21);
-        hasher.Add(M22);
-        hasher.Add(M23);
-        hasher.Add(M24);
-        hasher.Add(M31);
-        hasher.Add(M32);
-        hasher.Add(M33);
-        hasher.Add(M34);
-        hasher.Add(M41);
-        hasher.Add(M42);
-        hasher.Add(M43);
-        hasher.Add(M44);
-        return (int)hasher.Finalize32();
+        HashCode hash = new HashCode();
+        hash.Add(M11);
+        hash.Add(M12);
+        hash.Add(M13);
+        hash.Add(M14);
+        hash.Add(M21);
+        hash.Add(M22);
+        hash.Add(M23);
+        hash.Add(M24);
+        hash.Add(M31);
+        hash.Add(M32);
+        hash.Add(M33);
+        hash.Add(M34);
+        hash.Add(M41);
+        hash.Add(M42);
+        hash.Add(M43);
+        hash.Add(M44);
+        return hash.ToHashCode();
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

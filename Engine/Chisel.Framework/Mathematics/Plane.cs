@@ -120,9 +120,7 @@ public struct Plane : IEquatable<Plane>, IFormattable
 
     public override readonly int GetHashCode()
     {
-        Hasher hasher = new Hasher();
-        hasher.Add(Distance);
-        return (int)hasher.Finalize32() ^ Normal.GetHashCode();
+        return Distance.GetHashCode() ^ Normal.GetHashCode();
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

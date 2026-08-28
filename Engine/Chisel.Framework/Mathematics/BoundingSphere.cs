@@ -212,9 +212,7 @@ public struct BoundingSphere : IEquatable<BoundingSphere>, IFormattable
 
     public override readonly int GetHashCode()
     {
-        Hasher hasher = new Hasher();
-        hasher.Add(Radius);
-        return (int)hasher.Finalize32() ^ Center.GetHashCode();
+        return Radius.GetHashCode() ^ Center.GetHashCode();
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

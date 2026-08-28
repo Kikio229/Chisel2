@@ -271,11 +271,7 @@ public struct Vector3 : IEquatable<Vector3>, IFormattable
 
     public override readonly int GetHashCode()
     {
-        Hasher hasher = new Hasher();
-        hasher.Add(X);
-        hasher.Add(Y);
-        hasher.Add(Z);
-        return (int)hasher.Finalize32();
+        return X.GetHashCode() ^ Y.GetHashCode() ^ Z.GetHashCode();
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
