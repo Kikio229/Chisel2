@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Hexa.NET.SDL3;
@@ -16,9 +17,11 @@ public partial class GLGraphicsDevice : Disposable, IGraphicsDevice
     public ImageFormat[] ColorFormats => _currentColorFormats;
     public ImageFormat? DepthStencilFormat => _currentDepthStencilFormat;
 
-    internal GL _gl;
-    internal SDLGLContext _glContext;
-    internal GLGraphicsState _currentState; // To avoid duplicate state changes
+
+ 
+    private readonly GL _gl;
+    private readonly SDLGLContext _glContext;
+    private GLGraphicsState _currentState; // To avoid duplicate state changes
 
     private uint _currentVao, _currentSampleCount;
     private uint[] _boundTextureBySlot = new uint[16];
@@ -90,15 +93,18 @@ public partial class GLGraphicsDevice : Disposable, IGraphicsDevice
 
         _gl.BindFramebuffer(FramebufferTarget.Framebuffer, glTarget.Handle);
 
-        _currentColorFormats = (glTarget.Color!.Length > 0)
-            ? Array.ConvertAll(glTarget.Color, c => c.Format)
-            : Array.Empty<ImageFormat>();
+        if (glTarget.ColorInternal!.Length > 0)
+        {
+            _currentColorFormats = Array.ConvertAll(glTarget.ColorInternal, c => c.Format);
+            _currentSampleCount = glTarget.DepthStencilInternal!.SampleCount;
+        }
+        else
+        {
+            _currentColorFormats = Array.Empty<ImageFormat>();
+            _currentSampleCount = 1;
+        }
 
-        _currentDepthStencilFormat = glTarget.DepthStencil?.Format;
-        _currentSampleCount = (glTarget.Color!.Length > 0) ?
-            ((GLImage)glTarget.Color[0]).SampleCount : 
-                (glTarget.DepthStencil is GLImage glDepth ? 
-                glDepth.SampleCount : 1);
+        _currentDepthStencilFormat = glTarget.DepthStencilInternal?.Format;
     }
 
     public void EndDrawing()
@@ -114,8 +120,8 @@ public partial class GLGraphicsDevice : Disposable, IGraphicsDevice
 
     public void Clear(Color clearColor, float clearDepth, int clearStencil, GraphicsClearFlags flags)
     {
-        Vector4 cc = clearColor.ToVector4Normalized();
-        _gl.ClearColor(cc.X, cc.Y, cc.Z, cc.W);
+        Vector4 color = clearColor.ToVector4Normalized();
+        _gl.ClearColor(color.X, color.Y, color.Z, color.W);
         _gl.ClearDepth(clearDepth);
         _gl.ClearStencil(clearStencil);
 
@@ -395,9 +401,9 @@ public partial class GLGraphicsDevice : Disposable, IGraphicsDevice
     {
         GLMaterialTable glTable = (GLMaterialTable)materialTable;
 
-        for (uint i = 0; i < glTable.Textures.Length; i++)
+        for (uint i = 0; i < glTable.TexturesInternal.Length; i++)
         {
-            BindImage(glTable.Textures[i], i);
+            BindImage(glTable.TexturesInternal[i], i);
         }
     }
 
@@ -586,7 +592,7 @@ public partial class GLGraphicsDevice : Disposable, IGraphicsDevice
             throw new ArgumentException("A render target must have at least one attachment!", nameof(targetDesc));
         }
 
-        GLRenderTarget target = new GLRenderTarget(_gl, targetDesc.Color, targetDesc.DepthStencil);
+        GLRenderTarget target = new GLRenderTarget(_gl, targetDesc.Color.Cast<GLImage>().ToArray(), (GLImage?)targetDesc.DepthStencil);
         return (IRenderTarget)target;
     }
 
@@ -631,8 +637,9 @@ public partial class GLGraphicsDevice : Disposable, IGraphicsDevice
             glTextures[i] = (GLImage)tableDesc.Textures[i];
         }
 
-        return new GLMaterialTable(tableDesc.Textures);
+        return new GLMaterialTable(tableDesc.Textures.Cast<GLImage>().ToArray()); // .NET is big stinky and won't let you cast class arrays
     }
+
     public void GenerateMipmaps(IImage image, ReadOnlySpan<byte> baseLevelData)
     {
         GLImage glImage = (GLImage)image;
@@ -655,7 +662,7 @@ public partial class GLGraphicsDevice : Disposable, IGraphicsDevice
 
 #region GL Util
 
-    // Windows with GL is kinda silly
+    // Windows and GL is kinda silly
 #if WINDOWS
     [LibraryImport("kernel32.dll", EntryPoint = "GetProcAddress", StringMarshalling = StringMarshalling.Utf8)]
     [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]

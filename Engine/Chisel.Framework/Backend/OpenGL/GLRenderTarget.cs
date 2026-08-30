@@ -5,14 +5,16 @@ namespace Chisel.Framework;
 
 internal class GLRenderTarget : Disposable, IRenderTarget
 {
-    public IImage[]? Color { get; }
-    public IImage? DepthStencil { get; }
+    public IImage[]? Color => (IImage[]?)ColorInternal;
+    public IImage? DepthStencil => (IImage?)DepthStencilInternal;
 
     internal uint Handle { get; }
+    public GLImage[]? ColorInternal { get; set; }
+    public GLImage? DepthStencilInternal { get; set; }
 
     private readonly GL _gl;
 
-    public GLRenderTarget(GL gl, IImage[]? color, IImage? depthStencil)
+    public GLRenderTarget(GL gl, GLImage[]? color, GLImage? depthStencil)
     {
         _gl = gl;
         Handle = _gl.GenFramebuffer();
@@ -23,15 +25,13 @@ internal class GLRenderTarget : Disposable, IRenderTarget
         {
             for (int i = 0; i < color.Length; i++)
             {
-                GLImage colorImage = (GLImage)color[i];
-                _gl.FramebufferTexture2D(FramebufferTarget.Framebuffer, FramebufferAttachment.ColorAttachment0 + i, colorImage.Target, colorImage.Handle, 0);
+                _gl.FramebufferTexture2D(FramebufferTarget.Framebuffer, FramebufferAttachment.ColorAttachment0 + i, color[i].Target, color[i].Handle, 0);
             }
         }
 
         if (depthStencil != null)
         {
-            GLImage depthImage = (GLImage)depthStencil;
-            _gl.FramebufferTexture2D(FramebufferTarget.Framebuffer, FramebufferAttachment.DepthStencilAttachment, depthImage.Target, depthImage.Handle, 0);
+            _gl.FramebufferTexture2D(FramebufferTarget.Framebuffer, FramebufferAttachment.DepthStencilAttachment, depthStencil.Target, depthStencil.Handle, 0);
         }
 
         GLEnum status = _gl.CheckFramebufferStatus(FramebufferTarget.Framebuffer);
@@ -42,8 +42,8 @@ internal class GLRenderTarget : Disposable, IRenderTarget
             throw new InvalidOperationException("Framebuffer incomplete: " + status);
         }
 
-        Color = color;
-        DepthStencil = depthStencil;
+        ColorInternal = color;
+        DepthStencilInternal = depthStencil;
     }
 
     protected override void Dispose(bool disposing)

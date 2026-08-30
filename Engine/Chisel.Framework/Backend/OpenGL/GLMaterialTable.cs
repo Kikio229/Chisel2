@@ -4,18 +4,20 @@ namespace Chisel.Framework;
 
 internal class GLMaterialTable : Disposable, IMaterialTable
 {
-    public IImage[] Textures { get; }
+    public IImage[] Textures => (IImage[])TexturesInternal;
 
-    public GLMaterialTable(IImage[] textures)
+    internal GLImage[] TexturesInternal { get; set; }
+
+    public GLMaterialTable(GLImage[] textures)
     {
-        Textures = textures;
+        TexturesInternal = textures;
     }
 
     protected override void Dispose(bool disposing)
     {
         if (disposing)
         {
-            foreach (GLImage t in Textures)
+            foreach (GLImage t in TexturesInternal)
             {
                 t.Dispose();
             }
