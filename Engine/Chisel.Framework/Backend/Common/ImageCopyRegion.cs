@@ -6,11 +6,11 @@ public struct ImageCopyRegion
 {
     public uint Width;
     public uint Height;
-    public uint SrcOffsetX;
-    public uint SrcOffsetY;
+    public int SrcOffsetX;
+    public int SrcOffsetY;
     public uint SrcMipLevel;
-    public uint DstOffsetX;
-    public uint DstOffsetY;
+    public int DstOffsetX;
+    public int DstOffsetY;
     public uint DstMipLevel;
 
     public ImageCopyRegion()

@@ -176,90 +176,63 @@ internal static class GLUtilities
 
     public static PrimitiveType GetNativeTopologyMode(GraphicsTopology topology)
     {
-        switch (topology)
+        return topology switch
         {
-            case GraphicsTopology.TriangleList:
-                return PrimitiveType.Triangles;
-            case GraphicsTopology.TriangleStrip:
-                return PrimitiveType.TriangleStrip;
-            case GraphicsTopology.LineList:
-                return PrimitiveType.Lines;
-            case GraphicsTopology.LineStrip:
-                return PrimitiveType.LineStrip;
-            case GraphicsTopology.PointList:
-                return PrimitiveType.Points;
-            default:
-                throw new ArgumentOutOfRangeException(nameof(topology));
-        }
+            GraphicsTopology.TriangleList => PrimitiveType.Triangles,
+            GraphicsTopology.TriangleStrip => PrimitiveType.TriangleStrip,
+            GraphicsTopology.LineList => PrimitiveType.Lines,
+            GraphicsTopology.LineStrip => PrimitiveType.LineStrip,
+            GraphicsTopology.PointList => PrimitiveType.Points,
+            _ => throw new ArgumentOutOfRangeException(nameof(topology))
+        };
     }
 
     public static (bool, DepthFunction) GetNativeDepthMode(GraphicsDepthMode mode)
     {
-        switch (mode)
+        return mode switch
         {
-            case GraphicsDepthMode.Disabled:
-                return (false, DepthFunction.Always);
-            case GraphicsDepthMode.Less:
-                return (true, DepthFunction.Less);
-            case GraphicsDepthMode.LessOrEqual:
-                return (true, DepthFunction.Lequal);
-            case GraphicsDepthMode.Equal:
-                return (true, DepthFunction.Equal);
-            case GraphicsDepthMode.Greater:
-                return (true, DepthFunction.Greater);
-            case GraphicsDepthMode.GreaterOrEqual:
-                return (true, DepthFunction.Gequal);
-            case GraphicsDepthMode.Always:
-                return (true, DepthFunction.Always);
-            case GraphicsDepthMode.Never:
-                return (true, DepthFunction.Never);
-            default:
-                throw new ArgumentOutOfRangeException(nameof(mode));
-        }
+            GraphicsDepthMode.Disabled => (false, DepthFunction.Always),
+            GraphicsDepthMode.Less => (true, DepthFunction.Less),
+            GraphicsDepthMode.LessOrEqual => (true, DepthFunction.Lequal),
+            GraphicsDepthMode.Equal => (true, DepthFunction.Equal),
+            GraphicsDepthMode.Greater => (true, DepthFunction.Greater),
+            GraphicsDepthMode.GreaterOrEqual => (true, DepthFunction.Gequal),
+            GraphicsDepthMode.Always => (true, DepthFunction.Always),
+            GraphicsDepthMode.Never => (true, DepthFunction.Never),
+            _ => throw new ArgumentOutOfRangeException(nameof(mode))
+        };
     }
 
-    public static (bool, BlendingFactor, BlendingFactor, BlendEquationModeEXT) GetNativeBlendMode(GraphicsBlendMode mode)
+    public static (bool, BlendingFactor, BlendingFactor, BlendEquationModeEXT) GetNativeBlendMode( GraphicsBlendMode mode)
     {
-        switch (mode)
+        return mode switch
         {
-            case GraphicsBlendMode.Opaque:
-                return (false, BlendingFactor.One, BlendingFactor.Zero, BlendEquationModeEXT.FuncAdd);
-            case GraphicsBlendMode.Alpha:
-                return (true, BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha, BlendEquationModeEXT.FuncAdd);
-            case GraphicsBlendMode.Additive:
-                return (true, BlendingFactor.SrcAlpha, BlendingFactor.One, BlendEquationModeEXT.FuncAdd);
-            case GraphicsBlendMode.Multiply:
-                return (true, BlendingFactor.DstColor, BlendingFactor.Zero, BlendEquationModeEXT.FuncAdd);
-            default:
-                throw new ArgumentOutOfRangeException(nameof(mode));
-        }
+            GraphicsBlendMode.Opaque => (false, BlendingFactor.One, BlendingFactor.Zero, BlendEquationModeEXT.FuncAdd),
+            GraphicsBlendMode.Alpha => (true, BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha, BlendEquationModeEXT.FuncAdd),
+            GraphicsBlendMode.Additive => (true, BlendingFactor.SrcAlpha, BlendingFactor.One, BlendEquationModeEXT.FuncAdd),
+            GraphicsBlendMode.Multiply => (true, BlendingFactor.DstColor, BlendingFactor.Zero, BlendEquationModeEXT.FuncAdd),
+            _ => throw new ArgumentOutOfRangeException(nameof(mode))
+        };
     }
 
     public static (bool, TriangleFace) GetNativeCullMode(GraphicsCullMode mode)
     {
-        switch (mode)
+        return mode switch
         {
-            case GraphicsCullMode.None:
-                return (false, TriangleFace.Back);
-            case GraphicsCullMode.Front:
-                return (true, TriangleFace.Front);
-            case GraphicsCullMode.Back:
-                return (true, TriangleFace.Back);
-            default:
-                throw new ArgumentOutOfRangeException(nameof(mode));
-        }
+            GraphicsCullMode.None => (false, TriangleFace.Back),
+            GraphicsCullMode.Front => (true, TriangleFace.Front),
+            GraphicsCullMode.Back => (true, TriangleFace.Back),
+            _ => throw new ArgumentOutOfRangeException(nameof(mode))
+        };
     }
 
     public static PolygonMode GetNativeFillMode(GraphicsFillMode mode)
     {
-        switch (mode)
+        return mode switch
         {
-            case GraphicsFillMode.Solid:
-                return PolygonMode.Fill;
-            case GraphicsFillMode.Wireframe:
-                return PolygonMode.Line;
-            default:
-                throw new ArgumentOutOfRangeException(nameof(mode));
-        }
+            GraphicsFillMode.Solid => PolygonMode.Fill,
+            GraphicsFillMode.Wireframe => PolygonMode.Line,
+            _ => throw new ArgumentOutOfRangeException(nameof(mode))
+        };
     }
 }

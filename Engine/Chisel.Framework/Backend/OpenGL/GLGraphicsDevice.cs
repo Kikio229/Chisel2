@@ -198,24 +198,45 @@ public partial class GLGraphicsDevice : Disposable, IGraphicsDevice
         _gl.DrawElementsInstanced(_currentState.Topology, indexCount, DrawElementsType.UnsignedInt, (void*)(startIndex * sizeof(uint)), instCount);
     }
 
-    public void DrawIndirect(IBuffer buffer, ulong offset, uint drawCount, uint stride)
+    public unsafe void DrawIndirect(IBuffer buffer, ulong offset, uint drawCount, uint stride)
     {
-        throw new NotImplementedException();
+        if (buffer is not GLBuffer glBuffer)
+        {
+            throw new InvalidOperationException("Cannot GL draw indirect using a Non-GL buffer!");
+        }
+
+        _gl.BindBuffer(BufferTargetARB.DrawIndirectBuffer, glBuffer.Handle);
+        _gl.MultiDrawArraysIndirect(_currentState.Topology, (void*)offset, drawCount, (uint)stride);
+        _gl.BindBuffer(BufferTargetARB.DrawIndirectBuffer, 0);
     }
 
-    public void DrawIndexedIndirect(IBuffer buffer, ulong offset, uint drawCount, uint stride)
+    public unsafe void DrawIndexedIndirect(IBuffer buffer, ulong offset, uint drawCount, uint stride)
     {
-        throw new NotImplementedException();
+        if (buffer is not GLBuffer glBuffer)
+        {
+            throw new InvalidOperationException("Cannot GL draw indexed indirect using a Non-GL buffer!");
+        }
+
+        _gl.BindBuffer(BufferTargetARB.DrawIndirectBuffer, glBuffer.Handle);
+        _gl.MultiDrawElementsIndirect(_currentState.Topology, DrawElementsType.UnsignedInt, (void*)offset, drawCount, (uint)stride);
+        _gl.BindBuffer(BufferTargetARB.DrawIndirectBuffer, 0);
     }
 
     public void Dispatch(uint groupX, uint groupY, uint groupZ)
     {
-        throw new NotImplementedException();
+        _gl.DispatchCompute(groupX, groupY, groupZ);
     }
 
     public void DispatchIndirect(IBuffer buffer, ulong offset)
     {
-        throw new NotImplementedException();
+        if (buffer is not GLBuffer glBuffer)
+        {
+            throw new InvalidOperationException("Cannot GL dispatch indirect using a Non-GL buffer!");
+        }
+
+        _gl.BindBuffer(BufferTargetARB.DispatchIndirectBuffer, glBuffer.Handle);
+        _gl.DispatchComputeIndirect((nint)offset);
+        _gl.BindBuffer(BufferTargetARB.DispatchIndirectBuffer, 0);
     }
 
     public void SetViewport(Vector2 position, Vector2 size)
@@ -289,41 +310,60 @@ public partial class GLGraphicsDevice : Disposable, IGraphicsDevice
 
     public void BindVertexBuffer(IBuffer buffer, uint slot)
     {
-        GLBuffer glBuffer = (GLBuffer)buffer;
+        if (buffer is not GLBuffer glBuffer)
+        {
+            throw new InvalidOperationException("Cannot bind Non-GL vertex buffer to GL device!");
+        }
+
         _vbufferSlots[slot] = glBuffer.Handle;
     }
 
     public void BindIndexBuffer(IBuffer buffer)
     {
-        GLBuffer glBuffer = (GLBuffer)buffer;
+        if (buffer is not GLBuffer glBuffer)
+        {
+            throw new InvalidOperationException("Cannot bind Non-GL index buffer to GL device!");
+        }
+
         _gl.BindBuffer(BufferTargetARB.ElementArrayBuffer, glBuffer.Handle);
     }
 
     public void BindConstantBuffer(IBuffer buffer, uint slot)
     {
-        GLBuffer glBuffer = (GLBuffer)buffer;
-        _gl.BindBufferBase(BufferTargetARB.UniformBuffer, slot, glBuffer.Handle);
+        BindConstantBuffer(buffer, 0, (uint)buffer.Size, slot);
     }
 
     public void BindConstantBuffer(IBuffer buffer, ulong offset, uint size, uint slot)
     {
-        // GL is not magic yet
-        throw new NotImplementedException();
+        if (buffer is not GLBuffer glBuffer) 
+        { 
+            throw new InvalidOperationException("Cannot bind Non-GL constant buffer to GL device!"); 
+        }
+
+        _gl.BindBufferRange(BufferTargetARB.UniformBuffer, slot, glBuffer.Handle, (nint)offset, (nuint)size);
     }
 
     public (IBuffer arena, ulong offset) SuballocateBuffer(ReadOnlySpan<byte> data)
     {
-        throw new NotImplementedException();
+        throw new NotImplementedException("TODO: Implement in GL");
     }
 
     public void BindStorageBuffer(IBuffer buffer)
     {
-        throw new NotImplementedException();
+        if (buffer is not GLBuffer glBuffer)
+        {
+            throw new InvalidOperationException("Cannot bind Non-GL storage buffer to GL device!");
+        }
+
+        throw new NotImplementedException("TODO: Implement in GL");
     }
 
     public void BindImage(IImage image, uint slot)
     {
-        GLImage glImage = (GLImage)image;
+        if (image is not GLImage glImage)
+        {
+            throw new InvalidOperationException("Cannot bind Non-GL image to GL device!");
+        }
 
         if (_boundTextureBySlot[slot] == glImage.Handle)
         {
@@ -337,80 +377,91 @@ public partial class GLGraphicsDevice : Disposable, IGraphicsDevice
 
     public void BindSampler(ISampler sampler, uint slot)
     {
-        GLSampler glSampler = (GLSampler)sampler;
+        if (sampler is not GLSampler glSampler)
+        {
+            throw new InvalidOperationException("Cannot bind Non-GL sampler to GL device!");
+        }
+
         _gl.BindSampler(slot, glSampler.Handle);
     }
 
     public void BindGraphicsState(IGraphicsState graphicsState)
     {
-        if (graphicsState is not GLGraphicsState state)
+        if (graphicsState is not GLGraphicsState glState)
         {
-            Logger.AppendWarn("Cannot bind non-GL graphics state to GL device!");
-            return;
+            throw new InvalidOperationException("Cannot bind Non-GL graphics state to GL device!");
         }
 
-        if (state.Handle != _currentState.Handle)
+        if (glState.Handle != _currentState.Handle)
         {
-            _gl.UseProgram(state.Handle);
+            _gl.UseProgram(glState.Handle);
         }
 
         // Depth
-        if (state.DepthTestEnabled && !_currentState.DepthTestEnabled)
+        if (glState.DepthTestEnabled && !_currentState.DepthTestEnabled)
         {
             _gl.Enable(EnableCap.DepthTest);
-            _gl.DepthFunc(state.DepthFunc);
+            _gl.DepthFunc(glState.DepthFunc);
         }
-        else if (!state.DepthTestEnabled && _currentState.DepthTestEnabled)
+        else if (!glState.DepthTestEnabled && _currentState.DepthTestEnabled)
         {
             _gl.Disable(EnableCap.DepthTest);
         }
 
         // Depth write
-        if (state.DepthWriteEnabled != _currentState.DepthWriteEnabled)
+        if (glState.DepthWriteEnabled != _currentState.DepthWriteEnabled)
         {
-            _gl.DepthMask(state.DepthWriteEnabled);
+            _gl.DepthMask(glState.DepthWriteEnabled);
         }
 
         // Blend
-        if (state.BlendEnabled && !_currentState.BlendEnabled)
+        if (glState.BlendEnabled && !_currentState.BlendEnabled)
         {
             _gl.Enable(EnableCap.Blend);
-            _gl.BlendFunc(state.BlendSrcFactor, state.BlendDstFactor);
-            _gl.BlendEquation(state.BlendEquation);
+            _gl.BlendFunc(glState.BlendSrcFactor, glState.BlendDstFactor);
+            _gl.BlendEquation(glState.BlendEquation);
         }
-        else if (!state.BlendEnabled && _currentState.BlendEnabled)
+        else if (!glState.BlendEnabled && _currentState.BlendEnabled)
         {
             _gl.Disable(EnableCap.Blend);
         }
 
         // Cull
-        if (state.CullEnabled && !_currentState.CullEnabled)
+        if (glState.CullEnabled && !_currentState.CullEnabled)
         {
             _gl.Enable(EnableCap.CullFace);
-            _gl.CullFace(state.CullFace);
+            _gl.CullFace(glState.CullFace);
         }
-        else if (!state.CullEnabled && _currentState.CullEnabled)
+        else if (!glState.CullEnabled && _currentState.CullEnabled)
         {
             _gl.Disable(EnableCap.CullFace);
         }
 
         // Polygon mode
-        if (state.FillMode != _currentState.FillMode)
+        if (glState.FillMode != _currentState.FillMode)
         {
-            _gl.PolygonMode(TriangleFace.FrontAndBack, state.FillMode);
+            _gl.PolygonMode(TriangleFace.FrontAndBack, glState.FillMode);
         }
 
-        _currentState = state;
+        _currentState = glState;
     }
 
     public void BindComputeState(IComputeState computeState)
     {
-        throw new NotImplementedException();
+        if (computeState is not GLComputeState glState)
+        {
+            throw new InvalidOperationException("Cannot bind Non-GL compute state to GL device!");
+        }
+
+        throw new NotImplementedException("TODO: Implement in GL");
     }
 
     public void BindMaterialTable(IMaterialTable materialTable)
     {
-        GLMaterialTable glTable = (GLMaterialTable)materialTable;
+        if (materialTable is not GLMaterialTable glTable)
+        {
+            throw new InvalidOperationException("Cannot bind Non-GL material table to GL device!");
+        }
 
         for (uint i = 0; i < glTable.TexturesInternal.Length; i++)
         {
@@ -431,53 +482,83 @@ public partial class GLGraphicsDevice : Disposable, IGraphicsDevice
         }
     }
 
-    public unsafe void CopyBuffer(IBuffer bufferSrc, IBuffer bufferDst)
+    public void CopyBuffer(IBuffer bufferSrc, IBuffer bufferDst)
     {
-        GLBuffer glSrc = (GLBuffer)bufferSrc;
-        GLBuffer glDst = (GLBuffer)bufferDst;
+        BufferCopyRegion region = new BufferCopyRegion()
+        {
+            Size = bufferDst.Size,
+            SrcOffset = 0,
+            DstOffset = 0,
+        };
+
+        CopyBuffer(bufferSrc, bufferDst, region);
+    }
+
+    public unsafe void CopyBuffer(IBuffer bufferSrc, IBuffer bufferDst, BufferCopyRegion region)
+    {
+        if (bufferSrc is not GLBuffer glSrc)
+        {
+            throw new InvalidOperationException("Cannot copy from Non-GL buffer to GL buffer!");
+        }
+
+        if (bufferDst is not GLBuffer glDst)
+        {
+            throw new InvalidOperationException("Cannot copy to Non-GL buffer from GL buffer!");
+        }
 
         _gl.BindBuffer(BufferTargetARB.CopyWriteBuffer, glDst.Handle);
-        _gl.BufferData((GLEnum)BufferTargetARB.CopyWriteBuffer, (nuint)glSrc.Size, null, (GLEnum)GLUtilities.GetNativeBufferTarget(glSrc.Usage));
+        _gl.BufferData((GLEnum)BufferTargetARB.CopyWriteBuffer, (nuint)region.DstOffset, null, (GLEnum)GLUtilities.GetNativeBufferTarget(glSrc.Usage));
 
         _gl.BindBuffer(BufferTargetARB.CopyReadBuffer, glSrc.Handle);
-        _gl.CopyBufferSubData(CopyBufferSubDataTarget.CopyReadBuffer, CopyBufferSubDataTarget.CopyWriteBuffer, 0, 0, (nuint)glSrc.Size);
+        _gl.CopyBufferSubData(CopyBufferSubDataTarget.CopyReadBuffer, CopyBufferSubDataTarget.CopyWriteBuffer, (nint)region.SrcOffset, (nint)region.DstOffset, (nuint)region.Size);
     }
 
-    public void CopyBuffer(IBuffer bufferSrc, IBuffer bufferDst, BufferCopyRegion region)
+    public void CopyBufferToImage(IBuffer bufferSrc, IImage imageDst)
     {
-        throw new NotImplementedException("stub!!!");
-    }
+        ImageBufferCopyRegion region = new ImageBufferCopyRegion()
+        {
+            Width = imageDst.Width,
+            Height = imageDst.Height,
+            DstOffsetX = 0,
+            DstOffsetY = 0,
+            ImgMipLevel = 0,
+            BuffOffset = 0,
+        };
 
-    public unsafe void CopyBufferToImage(IBuffer bufferSrc, IImage imageDst)
-    {
-        GLBuffer glBuffer = (GLBuffer)bufferSrc;
-        GLImage glImage = (GLImage)imageDst;
-
-        (_, PixelFormat pixelFormat, PixelType pixelType) = GLUtilities.GetNativeImageFormat(glImage.Format);
-
-        _gl.BindBuffer(BufferTargetARB.PixelUnpackBuffer, glBuffer.Handle);
-        _gl.BindTexture(TextureTarget.Texture2D, glImage.Handle);
-        _gl.TexSubImage2D(TextureTarget.Texture2D, 0, 0, 0, glImage.Width, glImage.Height, pixelFormat, pixelType, null);
-        _gl.BindBuffer(BufferTargetARB.PixelUnpackBuffer, 0);
+        CopyBufferToImage(bufferSrc, imageDst, region);
     }
 
     public unsafe void CopyBufferToImage(IBuffer bufferSrc, IImage imageDst, ImageBufferCopyRegion region)
     {
-        GLBuffer glBuffer = (GLBuffer)bufferSrc;
-        GLImage glImage = (GLImage)imageDst;
+        if (bufferSrc is not GLBuffer glSrc)
+        {
+            throw new InvalidOperationException("Cannot copy from Non-GL buffer to GL image!");
+        }
 
-        (_, PixelFormat pixelFormat, PixelType pixelType) = GLUtilities.GetNativeImageFormat(glImage.Format);
+        if (imageDst is not GLImage glDst)
+        {
+            throw new InvalidOperationException("Cannot copy to Non-GL image from GL buffer!");
+        }
 
-        _gl.BindBuffer(BufferTargetARB.PixelUnpackBuffer, glBuffer.Handle);
-        _gl.BindTexture(TextureTarget.Texture2D, glImage.Handle);
+        (_, PixelFormat pixelFormat, PixelType pixelType) = GLUtilities.GetNativeImageFormat(glDst.Format);
+
+        _gl.BindBuffer(BufferTargetARB.PixelUnpackBuffer, glSrc.Handle);
+        _gl.BindTexture(TextureTarget.Texture2D, glDst.Handle);
         _gl.TexSubImage2D(TextureTarget.Texture2D, (int)region.ImgMipLevel, region.DstOffsetX, region.DstOffsetY, region.Width, region.Height, pixelFormat, pixelType, null);
         _gl.BindBuffer(BufferTargetARB.PixelUnpackBuffer, 0);
     }
 
     public void ResolveImage(IImage imageSrc, IImage imageDst)
     {
-        GLImage glSrc = (GLImage)imageSrc;
-        GLImage glDst = (GLImage)imageDst;
+        if (imageSrc is not GLImage glSrc)
+        {
+            throw new InvalidOperationException("Cannot copy from Non-GL image to GL image!");
+        }
+
+        if (imageDst is not GLImage glDst)
+        {
+            throw new InvalidOperationException("Cannot copy to Non-GL image from GL image!");
+        }
 
         uint readFbo = _gl.GenFramebuffer();
         uint drawFbo = _gl.GenFramebuffer();
@@ -497,22 +578,69 @@ public partial class GLGraphicsDevice : Disposable, IGraphicsDevice
 
     public void CopyImage(IImage imageSrc, IImage imageDst)
     {
-        throw new NotImplementedException("TODO: Image copying is not implemented on either backend yet!");
+        ImageCopyRegion region = new ImageCopyRegion()
+        {
+            Width = imageSrc.Width,
+            Height = imageSrc.Height,
+            SrcOffsetX = 0,
+            SrcOffsetY = 0,
+            SrcMipLevel = 0,
+            DstOffsetX = 0,
+            DstOffsetY = 0,
+            DstMipLevel = 0,
+        };
+
+        CopyImage(imageSrc, imageDst, region);
     }
 
     public void CopyImage(IImage imageSrc, IImage imageDst, ImageCopyRegion region)
     {
-        throw new NotImplementedException("TODO: Image copying is not implemented on either backend yet!");
+        if (imageSrc is not GLImage glSrc)
+        {
+            throw new InvalidOperationException("Cannot copy from Non-GL image to GL image!");
+        }
+
+        if (imageDst is not GLImage glDst)
+        {
+            throw new InvalidOperationException("Cannot copy to Non-GL image from GL image!");
+        }
+
+        _gl.CopyImageSubData(glSrc.Handle, CopyImageSubDataTarget.Texture2D, (int)region.SrcMipLevel, region.SrcOffsetX, region.SrcOffsetY, 0, 
+            glDst.Handle, CopyImageSubDataTarget.Texture2D, (int)region.DstMipLevel, region.DstOffsetX, region.DstOffsetY, 0, region.Width, region.Height, 1);
     }
 
     public void CopyImageToBuffer(IImage imageSrc, IBuffer bufferDst)
     {
-        throw new NotImplementedException("TODO: Image copying to buffer is not implemented on either backend yet!");
+        ImageBufferCopyRegion region = new ImageBufferCopyRegion()
+        {
+            Width = imageSrc.Width,
+            Height = imageSrc.Height,
+            DstOffsetX = 0,
+            DstOffsetY = 0,
+            ImgMipLevel = 0,
+            BuffOffset = 0,
+        };
+
+        CopyImageToBuffer(imageSrc, bufferDst, region);
     }
 
-    public void CopyImageToBuffer(IImage imageSrc, IBuffer bufferDst, ImageBufferCopyRegion region)
+    public unsafe void CopyImageToBuffer(IImage imageSrc, IBuffer bufferDst, ImageBufferCopyRegion region)
     {
-        throw new NotImplementedException("TODO: Image copying to buffer is not implemented on either backend yet!");
+        if (imageSrc is not GLImage glSrc)
+        {
+            throw new InvalidOperationException("Cannot copy from Non-GL image to GL buffer!");
+        }
+
+        if (bufferDst is not GLBuffer glDst)
+        {
+            throw new InvalidOperationException("Cannot copy to Non-GL buffer from GL image!");
+        }
+
+        (_, PixelFormat pixelFormat, PixelType pixelType) = GLUtilities.GetNativeImageFormat(glSrc.Format);
+        _gl.BindBuffer(BufferTargetARB.PixelPackBuffer, glDst.Handle);
+        _gl.BindTexture(TextureTarget.Texture2D, glSrc.Handle);
+        _gl.GetTexImage(TextureTarget.Texture2D, (int)region.ImgMipLevel, pixelFormat, pixelType, (void*)region.BuffOffset);
+        _gl.BindBuffer(BufferTargetARB.PixelPackBuffer, 0);
     }
 
     public IBuffer CreateBuffer(BufferDescription bufferDesc)
@@ -636,24 +764,28 @@ public partial class GLGraphicsDevice : Disposable, IGraphicsDevice
 
     public IComputeState CreateComputeState(ComputeStateDescription computeDesc)
     {
-        throw new NotImplementedException();
+        throw new NotImplementedException("TODO: Implement in GL");
     }
 
-    public IMaterialTable CreateMaterialTable(MaterialTableDescription tableDesc)
+    public IMaterialTable CreateMaterialTable(MaterialTableDescription materialDesc)
     {
-        GLImage[] glTextures = new GLImage[tableDesc.Textures!.Length];
+        GLImage[] glTextures = new GLImage[materialDesc.Textures!.Length];
 
-        for (int i = 0; i < tableDesc.Textures!.Length; i++)
+        for (int i = 0; i < materialDesc.Textures!.Length; i++)
         {
-            glTextures[i] = (GLImage)tableDesc.Textures[i];
+            glTextures[i] = (GLImage)materialDesc.Textures[i];
         }
 
-        return new GLMaterialTable(tableDesc.Textures.Cast<GLImage>().ToArray()); // .NET is big stinky and won't let you cast class arrays
+        return new GLMaterialTable(materialDesc.Textures.Cast<GLImage>().ToArray()); // .NET is big stinky and won't let you cast class arrays
     }
 
     public void GenerateMipmaps(IImage image, ReadOnlySpan<byte> baseLevelData)
     {
-        GLImage glImage = (GLImage)image;
+        if (image is not GLImage glImage)
+        {
+            throw new InvalidOperationException("Cannot generate GL mips for Non-GL image!");
+        }
+
         if (glImage.MipLevels <= 1)
         {
             return;
@@ -665,10 +797,7 @@ public partial class GLGraphicsDevice : Disposable, IGraphicsDevice
 
     protected override void Dispose(bool disposing)
     {
-        if (Backend == GraphicsBackend.OpenGL)
-        {
-            SDL.GLDestroyContext(_glContext);
-        }
+        SDL.GLDestroyContext(_glContext);
     }
 
 #region GL Util

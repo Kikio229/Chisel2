@@ -1,5 +1,4 @@
 ﻿using Chisel.Framework;
-using Chisel.Resource;
 using Silk.NET.OpenGL;
 using System;
 using System.Collections.Generic;

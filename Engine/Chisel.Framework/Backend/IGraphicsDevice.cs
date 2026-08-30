@@ -67,6 +67,6 @@ public interface IGraphicsDevice
     IRenderTarget CreateRenderTarget(RenderTargetDescription targetDesc);
     IGraphicsState CreateGraphicsState(GraphicsStateDescription graphicsDesc);
     IComputeState CreateComputeState(ComputeStateDescription computeDesc);
-    IMaterialTable CreateMaterialTable(MaterialTableDescription tableDesc);
+    IMaterialTable CreateMaterialTable(MaterialTableDescription materialDesc);
     void GenerateMipmaps(IImage image, ReadOnlySpan<byte> baseData);
 }
