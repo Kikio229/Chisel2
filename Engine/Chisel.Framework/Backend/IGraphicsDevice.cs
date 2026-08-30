@@ -25,9 +25,12 @@ public interface IGraphicsDevice
     void DrawInstanced(uint vertexCount, uint instCount);
     void DrawIndexedInstanced(uint indexCount, uint instCount);
     void DrawIndexedInstanced(uint indexCount, uint instCount, uint startIndex, int baseVertex);
+    void DrawIndirect(IBuffer buffer, uint drawCount);
     void DrawIndirect(IBuffer buffer, ulong offset, uint drawCount, uint stride);
+    void DrawIndexedIndirect(IBuffer buffer, uint drawCount);
     void DrawIndexedIndirect(IBuffer buffer, ulong offset, uint drawCount, uint stride);
     void Dispatch(uint groupX, uint groupY, uint groupZ);
+    void DispatchIndirect(IBuffer buffer);
     void DispatchIndirect(IBuffer buffer, ulong offset);
 
     void SetViewport(Vector2 position, Vector2 size);
@@ -47,18 +50,20 @@ public interface IGraphicsDevice
     void BindComputeState(IComputeState computeState);
     void BindMaterialTable(IMaterialTable materialTable);
 
+    void UpdateBuffer(IBuffer buffer, ReadOnlySpan<byte> data);
     void UpdateBuffer(IBuffer buffer, ReadOnlySpan<byte> data, ulong offset);
-    (IBuffer arena, ulong offset) SuballocateBuffer(ReadOnlySpan<byte> data);
     void CopyBuffer(IBuffer bufferSrc, IBuffer bufferDst);
     void CopyBuffer(IBuffer bufferSrc, IBuffer bufferDst, BufferCopyRegion region);
     void CopyBufferToImage(IBuffer buffer, IImage image);
     void CopyBufferToImage(IBuffer buffer, IImage image, ImageBufferCopyRegion region);
+    void SuballocBuffer(ReadOnlySpan<byte> data, out IBuffer arena, out ulong offset);
 
-    void ResolveImage(IImage imageSrc, IImage imageDst); // For MSAA
     void CopyImage(IImage imageSrc, IImage imageDst, ImageCopyRegion region);
     void CopyImage(IImage imageSrc, IImage imageDst);
     void CopyImageToBuffer(IImage imageSrc, IBuffer bufferDst);
     void CopyImageToBuffer(IImage imageSrc, IBuffer bufferDst, ImageBufferCopyRegion region);
+    void ResolveImage(IImage imageSrc, IImage imageDst); // For MSAA
+
 
     IBuffer CreateBuffer(BufferDescription bufferDesc);
     IImage CreateImage(ImageDescription imageDesc);

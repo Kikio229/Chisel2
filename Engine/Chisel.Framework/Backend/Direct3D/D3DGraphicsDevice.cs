@@ -619,7 +619,17 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
         _mainCmdList.Get()->DrawIndexedInstanced(idxCount, instCount, startIndex, baseVertex, 0);
     }
 
+    public void DrawIndirect(IBuffer buffer, uint drawCount)
+    {
+        throw new NotImplementedException("TODO: Indirect draws are not implemented on either backend yet!");
+    }
+
     public void DrawIndirect(IBuffer buffer, ulong offset, uint drawCount, uint stride)
+    {
+        throw new NotImplementedException("TODO: Indirect draws are not implemented on either backend yet!");
+    }
+
+    public void DrawIndexedIndirect(IBuffer buffer, uint drawCount)
     {
         throw new NotImplementedException("TODO: Indirect draws are not implemented on either backend yet!");
     }
@@ -630,6 +640,11 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
     }
 
     public void Dispatch(uint groupX, uint groupY, uint groupZ)
+    {
+        throw new NotImplementedException("TODO: Compute is not implemented on either backend yet!");
+    }
+
+    public void DispatchIndirect(IBuffer buffer)
     {
         throw new NotImplementedException("TODO: Compute is not implemented on either backend yet!");
     }
@@ -850,6 +865,11 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
         _mainCmdList.Get()->SetGraphicsRootDescriptorTable(_rootShaderResources, table.SrvTable);
     }
 
+    public void UpdateBuffer(IBuffer buffer, ReadOnlySpan<byte> data)
+    {
+        UpdateBuffer(buffer, data, 0);
+    }
+
     public unsafe void UpdateBuffer(IBuffer buffer, ReadOnlySpan<byte> data, ulong offset)
     {
         D3DBuffer d3dBuffer = (D3DBuffer)buffer;
@@ -877,9 +897,11 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
         d3dBuffer.Resource->Unmap(0, null);
     }
 
-    public unsafe (IBuffer arena, ulong offset) SuballocateBuffer(ReadOnlySpan<byte> data)
+    public void SuballocBuffer(ReadOnlySpan<byte> data, out IBuffer arena, out ulong offset)
     {
-        return _cbufferRings[_frameIndex].AllocBuffer(data);
+        (IBuffer arena, ulong offset) suballoc = _cbufferRings[_frameIndex].AllocBuffer(data);
+        arena = suballoc.arena;
+        offset = suballoc.offset;
     }
 
     public void CopyBuffer(IBuffer bufSrc, IBuffer bufDst)

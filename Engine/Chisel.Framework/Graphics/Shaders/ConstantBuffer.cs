@@ -81,7 +81,7 @@ public class ConstantBuffer : IDisposable
     {
         if (useArena)
         {
-            var (arena, offset) = GraphicsDevice.SuballocateBuffer(data);
+            GraphicsDevice.SuballocBuffer(data, out var arena, out var offset);
             GraphicsDevice.BindConstantBuffer(arena, offset, (uint)data.Length, Slot);
         }
         else

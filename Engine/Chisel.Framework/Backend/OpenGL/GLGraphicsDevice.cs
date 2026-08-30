@@ -198,6 +198,11 @@ public partial class GLGraphicsDevice : Disposable, IGraphicsDevice
         _gl.DrawElementsInstanced(_currentState.Topology, indexCount, DrawElementsType.UnsignedInt, (void*)(startIndex * sizeof(uint)), instCount);
     }
 
+    public void DrawIndirect(IBuffer buffer, uint drawCount)
+    {
+        DrawIndirect(buffer, 0, drawCount, 0);
+    }
+
     public unsafe void DrawIndirect(IBuffer buffer, ulong offset, uint drawCount, uint stride)
     {
         if (buffer is not GLBuffer glBuffer)
@@ -208,6 +213,11 @@ public partial class GLGraphicsDevice : Disposable, IGraphicsDevice
         _gl.BindBuffer(BufferTargetARB.DrawIndirectBuffer, glBuffer.Handle);
         _gl.MultiDrawArraysIndirect(_currentState.Topology, (void*)offset, drawCount, (uint)stride);
         _gl.BindBuffer(BufferTargetARB.DrawIndirectBuffer, 0);
+    }
+
+    public void DrawIndexedIndirect(IBuffer buffer, uint drawCount)
+    {
+        DrawIndexedIndirect(buffer, 0, drawCount, 0);
     }
 
     public unsafe void DrawIndexedIndirect(IBuffer buffer, ulong offset, uint drawCount, uint stride)
@@ -225,6 +235,11 @@ public partial class GLGraphicsDevice : Disposable, IGraphicsDevice
     public void Dispatch(uint groupX, uint groupY, uint groupZ)
     {
         _gl.DispatchCompute(groupX, groupY, groupZ);
+    }
+
+    public void DispatchIndirect(IBuffer buffer)
+    {
+        DispatchIndirect(buffer, 0);
     }
 
     public void DispatchIndirect(IBuffer buffer, ulong offset)
@@ -343,10 +358,6 @@ public partial class GLGraphicsDevice : Disposable, IGraphicsDevice
         _gl.BindBufferRange(BufferTargetARB.UniformBuffer, slot, glBuffer.Handle, (nint)offset, (nuint)size);
     }
 
-    public (IBuffer arena, ulong offset) SuballocateBuffer(ReadOnlySpan<byte> data)
-    {
-        throw new NotImplementedException("TODO: Implement in GL");
-    }
 
     public void BindStorageBuffer(IBuffer buffer)
     {
@@ -469,7 +480,12 @@ public partial class GLGraphicsDevice : Disposable, IGraphicsDevice
         }
     }
 
-    public unsafe void UpdateBuffer(IBuffer buffer, ReadOnlySpan<byte> data, ulong offset = 0)
+    public void UpdateBuffer(IBuffer buffer, ReadOnlySpan<byte> data)
+    {
+        UpdateBuffer(buffer, data, 0);
+    }
+
+    public unsafe void UpdateBuffer(IBuffer buffer, ReadOnlySpan<byte> data, ulong offset)
     {
         GLBuffer glBuffer = (GLBuffer)buffer;
         BufferTargetARB target = GLUtilities.GetNativeBufferTarget(glBuffer.Usage);
@@ -480,6 +496,11 @@ public partial class GLGraphicsDevice : Disposable, IGraphicsDevice
         {
             _gl.BufferSubData(target, (nint)offset, (nuint)data.Length, ptr);
         }
+    }
+
+    public void SuballocBuffer(ReadOnlySpan<byte> data, out IBuffer arena, out ulong offset)
+    {
+        throw new NotImplementedException("TODO: Implement in GL");
     }
 
     public void CopyBuffer(IBuffer bufferSrc, IBuffer bufferDst)
