@@ -1,5 +1,4 @@
 ﻿using Chisel.Framework;
-using Chisel.Framework.Utilities;
 using Chisel.Resource;
 using Silk.NET.OpenGL;
 using System;
@@ -60,8 +59,18 @@ public class TestGame : Game
         defaultSpecular = CreateFlatTexture(GraphicsDevice, 128, 128, 128, 0);
         defaultNormal = CreateFlatTexture(GraphicsDevice, 128, 128, 255, 255);
 
-        faceMaterial = GraphicsDevice.CreateMaterialTable(new IImage[] { face.Image, defaultSpecular.Image, defaultNormal.Image });
-        gridMaterial = GraphicsDevice.CreateMaterialTable(new IImage[] { grid.Image, defaultSpecular.Image, defaultNormal.Image });
+        IImage[] mat0 = new IImage[3] { face.Image, defaultSpecular.Image, defaultNormal.Image };
+        IImage[] mat1 = new IImage[3] { grid.Image, defaultSpecular.Image, defaultNormal.Image };
+
+        faceMaterial = GraphicsDevice.CreateMaterialTable(new MaterialTableDescription()
+        {
+            Textures = mat0
+        });
+
+        gridMaterial = GraphicsDevice.CreateMaterialTable(new MaterialTableDescription()
+        {
+            Textures = mat1
+        });
 
         sampler = GraphicsDevice.CreateSampler(new SamplerDescription
         {

@@ -7,6 +7,7 @@ public interface IImage
     uint Width { get; }
     uint Height { get; }
     uint MipLevels { get; }
+    uint SampleCount { get; }
     ImageFormat Format { get; }
     ImageUsage Usage { get; }
 }

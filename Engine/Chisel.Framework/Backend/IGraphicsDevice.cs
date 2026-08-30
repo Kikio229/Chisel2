@@ -6,7 +6,7 @@ public interface IGraphicsDevice
 {
     uint FrameIndex { get; }
     uint SampleCount { get; }
-    uint BufferingCount { get; }
+    uint BufferCount { get; }
     GraphicsBackend Backend { get; }
     ImageFormat[] ColorFormats { get; }
     ImageFormat? DepthStencilFormat { get; }
@@ -19,12 +19,12 @@ public interface IGraphicsDevice
     void Clear(Color clearColor, float clearDepth, int clearStencil, GraphicsClearFlags flags);
     void Resize(int width, int height);
 
-    void Draw(uint vtxCount);
-    void DrawIndexed(uint idxCount);
-    void DrawIndexed(uint idxCount, uint startIndex, int baseVertex);
-    void DrawInstanced(uint vtxCount, uint instCount);
-    void DrawIndexedInstanced(uint idxCount, uint instCount);
-    void DrawIndexedInstanced(uint idxCount, uint instCount, uint startIndex, int baseVertex);
+    void Draw(uint vertexCount);
+    void DrawIndexed(uint indexCount);
+    void DrawIndexed(uint indexCount, uint startIndex, int baseVertex);
+    void DrawInstanced(uint vertexCount, uint instCount);
+    void DrawIndexedInstanced(uint indexCount, uint instCount);
+    void DrawIndexedInstanced(uint indexCount, uint instCount, uint startIndex, int baseVertex);
     void DrawIndirect(IBuffer buffer, ulong offset, uint drawCount, uint stride);
     void DrawIndexedIndirect(IBuffer buffer, ulong offset, uint drawCount, uint stride);
     void Dispatch(uint groupX, uint groupY, uint groupZ);
@@ -43,30 +43,30 @@ public interface IGraphicsDevice
     void BindStorageBuffer(IBuffer buffer);
     void BindImage(IImage image, uint slot);
     void BindSampler(ISampler sampler, uint slot);
-    void BindGraphicsState(IGraphicsState gfxState);
-    void BindComputeState(IComputeState cmpState);
+    void BindGraphicsState(IGraphicsState graphicsState);
+    void BindComputeState(IComputeState computeState);
     void BindMaterialTable(IMaterialTable materialTable);
 
     void UpdateBuffer(IBuffer buffer, ReadOnlySpan<byte> data, ulong offset);
     (IBuffer arena, ulong offset) SuballocateBuffer(ReadOnlySpan<byte> data);
-    void CopyBuffer(IBuffer bufSrc, IBuffer bufDst);
-    void CopyBuffer(IBuffer bufSrc, IBuffer bufDst, BufferCopyRegion region);
+    void CopyBuffer(IBuffer bufferSrc, IBuffer bufferDst);
+    void CopyBuffer(IBuffer bufferSrc, IBuffer bufferDst, BufferCopyRegion region);
     void CopyBufferToImage(IBuffer buffer, IImage image);
     void CopyBufferToImage(IBuffer buffer, IImage image, ImageBufferCopyRegion region);
 
-    void ResolveImage(IImage src, IImage dst); // For MSAA
-    void CopyImage(IImage imgSrc, IImage imgDst, ImageCopyRegion region);
-    void CopyImage(IImage imgSrc, IImage bufDst);
-    void CopyImageToBuffer(IImage imgSrc, IBuffer bufDst);
-    void CopyImageToBuffer(IImage imgSrc, IBuffer bufDst, ImageBufferCopyRegion region);
+    void ResolveImage(IImage imageSrc, IImage imageDst); // For MSAA
+    void CopyImage(IImage imageSrc, IImage imageDst, ImageCopyRegion region);
+    void CopyImage(IImage imageSrc, IImage imageDst);
+    void CopyImageToBuffer(IImage imageSrc, IBuffer bufferDst);
+    void CopyImageToBuffer(IImage imageSrc, IBuffer bufferDst, ImageBufferCopyRegion region);
 
-    IBuffer CreateBuffer(BufferDescription bufDesc);
-    IImage CreateImage(ImageDescription imgDesc);
-    ISampler CreateSampler(SamplerDescription smpDesc);
-    IShader CreateShader(ShaderDescription shdDesc);
-    IRenderTarget CreateRenderTarget(RenderTargetDescription renDesc);
-    IGraphicsState CreateGraphicsState(GraphicsStateDescription gfxDesc);
-    IComputeState CreateComputeState(ComputeStateDescription cmpDesc);
-    IMaterialTable CreateMaterialTable(IImage[] textures);
-    void GenerateMipmaps(IImage image, ReadOnlySpan<byte> baseLevelData);
+    IBuffer CreateBuffer(BufferDescription bufferDesc);
+    IImage CreateImage(ImageDescription imageDesc);
+    ISampler CreateSampler(SamplerDescription samplerDesc);
+    IShader CreateShader(ShaderDescription shaderDesc);
+    IRenderTarget CreateRenderTarget(RenderTargetDescription targetDesc);
+    IGraphicsState CreateGraphicsState(GraphicsStateDescription graphicsDesc);
+    IComputeState CreateComputeState(ComputeStateDescription computeDesc);
+    IMaterialTable CreateMaterialTable(MaterialTableDescription tableDesc);
+    void GenerateMipmaps(IImage image, ReadOnlySpan<byte> baseData);
 }

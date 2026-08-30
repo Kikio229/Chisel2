@@ -7,7 +7,8 @@ internal class D3DMaterialTable : IMaterialTable
 {
     public GpuDescriptorHandle SrvTable { get; internal set; }
     internal uint RelativeSlot;
-    internal D3DImage[] Textures;
+    public IImage[] Textures { get; }
+    internal D3DImage[] TextureImages;
 }
 internal readonly struct MaterialCacheKey : IEquatable<MaterialCacheKey>
 {

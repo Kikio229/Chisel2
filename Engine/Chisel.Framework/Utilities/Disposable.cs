@@ -6,7 +6,7 @@ public abstract class Disposable : IDisposable
 {
     public bool IsDisposed { get; private set; }
 #if DEBUG
-    readonly string creationStackTrace = Environment.StackTrace;
+    private readonly string _stackTrace = Environment.StackTrace;
 #endif
 
     public Disposable()
@@ -19,7 +19,7 @@ public abstract class Disposable : IDisposable
         if (!IsDisposed)
         {
 #if DEBUG
-            Logger.AppendWarn($"{GetType().Name} was garbage collected without Dispose() being called, native resource leaked. Created at:\n{creationStackTrace}");
+            Logger.AppendWarn($"{GetType().Name} was garbage collected without Dispose() being called, native resource leaked. Created at:\n{_stackTrace}");
 #else
             Logger.AppendWarn($"{GetType().Name} was garbage collected without Dispose() being called, native resource leaked. Run in Debug for a creation stack trace.");
 #endif

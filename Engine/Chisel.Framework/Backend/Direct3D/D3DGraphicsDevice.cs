@@ -20,7 +20,7 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
 {
     public uint FrameIndex => _frameIndex;
     public uint SampleCount => _sampleCount;
-    public uint BufferingCount => _maxFramesInFlight;
+    public uint BufferCount => _maxFramesInFlight;
     public GraphicsBackend Backend => GraphicsBackend.Direct3D;
     public ImageFormat[] ColorFormats => _colorFormats;
     public ImageFormat? DepthStencilFormat => _depthStencilFormat;
@@ -947,7 +947,7 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
         uint tightRowPitch = region.Width * D3DUtilities.GetBytesPerPixel(dst.Format);
         ulong paddedSize = footprint.Footprint.RowPitch * (ulong)footprint.Footprint.Height;
 
-        D3DBuffer padded = new D3DBuffer(_allocator, paddedSize, BufferType.Upload, BufferUsage.CopySource);
+        D3DBuffer padded = new D3DBuffer(_allocator, paddedSize, BufferType.Upload, BufferUsage.CopySrc);
 
         void* srcMapped;
         void* dstMapped;
@@ -1033,7 +1033,7 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
 
     public IBuffer CreateBuffer(BufferDescription bufDesc)
     {
-        const BufferUsage knownFlags = BufferUsage.Vertex | BufferUsage.Index | BufferUsage.Constant | BufferUsage.Storage | BufferUsage.Indirect | BufferUsage.CopySource;
+        const BufferUsage knownFlags = BufferUsage.Vertex | BufferUsage.Index | BufferUsage.Constant | BufferUsage.Storage | BufferUsage.Indirect | BufferUsage.CopySrc;
 
         if (bufDesc.Size == 0)
         {
@@ -1242,24 +1242,24 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
         D3DComputeState cmpState = new D3DComputeState((ID3D12Device*)_device.Get(), (D3DShader)cmpDesc.ComputeShader);
         return (IComputeState)cmpState;
     }
-    public unsafe IMaterialTable CreateMaterialTable(IImage[] textures)
+    public unsafe IMaterialTable CreateMaterialTable(MaterialTableDescription tableDesc)
     {
-        MaterialCacheKey key = new MaterialCacheKey(textures);
+        MaterialCacheKey key = new MaterialCacheKey(tableDesc.Textures);
 
         if (_materialTableCache.TryGetValue(key, out D3DMaterialTable cached))
         {
             return cached;
         }
 
-        D3DImage[] d3dTextures = new D3DImage[textures.Length];
+        D3DImage[] d3dTextures = new D3DImage[tableDesc.Textures.Length];
 
-        for (int i = 0; i < textures.Length; i++)
+        for (int i = 0; i < tableDesc.Textures.Length; i++)
         {
-            d3dTextures[i] = (D3DImage)textures[i];
+            d3dTextures[i] = (D3DImage)tableDesc.Textures[i];
         }
 
         uint relativeSlot = AllocatePersistentSrvRange((uint)d3dTextures.Length);
-        D3DMaterialTable table = new D3DMaterialTable { RelativeSlot = relativeSlot, Textures = d3dTextures };
+        D3DMaterialTable table = new D3DMaterialTable { RelativeSlot = relativeSlot, TextureImages = d3dTextures };
         WriteMaterialTableDescriptors(table);
 
         _materialTableCache[key] = table;
@@ -1271,9 +1271,9 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
     {
         uint baseSlot = _materialTableRegionStart + table.RelativeSlot;
 
-        for (int i = 0; i < table.Textures.Length; i++)
+        for (int i = 0; i < table.TextureImages.Length; i++)
         {
-            CpuDescriptorHandle src = GetOrCreateImageSrv(table.Textures[i]);
+            CpuDescriptorHandle src = GetOrCreateImageSrv(table.TextureImages[i]);
             CpuDescriptorHandle dst = _resourceHeap.GetCpuAt(baseSlot + (uint)i);
             _device.Get()->CopyDescriptorsSimple(1, dst, src, DescriptorHeapType.CbvSrvUav);
         }
@@ -1685,7 +1685,7 @@ public class D3DGraphicsDevice : Disposable, IGraphicsDevice
         uint tightRowPitch = width * D3DUtilities.GetBytesPerPixel(dst.Format);
         ulong paddedSize = footprint.Footprint.RowPitch * (ulong)footprint.Footprint.Height;
 
-        D3DBuffer padded = new D3DBuffer(_allocator, paddedSize, BufferType.Upload, BufferUsage.CopySource);
+        D3DBuffer padded = new D3DBuffer(_allocator, paddedSize, BufferType.Upload, BufferUsage.CopySrc);
 
         void* dstMapped;
         padded.Resource->Map(0, null, &dstMapped);

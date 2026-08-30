@@ -1,5 +1,24 @@
-﻿namespace Chisel.Framework;
-public class GLMaterialTable : IMaterialTable
+﻿using System;
+
+namespace Chisel.Framework;
+
+internal class GLMaterialTable : Disposable, IMaterialTable
 {
-    public GLImage[] Textures;
+    public IImage[] Textures { get; }
+
+    public GLMaterialTable(IImage[] textures)
+    {
+        Textures = textures;
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            foreach (GLImage t in Textures)
+            {
+                t.Dispose();
+            }
+        }
+    }
 }

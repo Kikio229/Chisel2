@@ -1,9 +1,5 @@
-﻿using Silk.NET.OpenGL;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using System;
+using Silk.NET.OpenGL;
 
 namespace Chisel.Framework;
 
@@ -11,14 +7,41 @@ internal class GLRenderTarget : Disposable, IRenderTarget
 {
     public IImage[]? Color { get; }
     public IImage? DepthStencil { get; }
+
     internal uint Handle { get; }
 
-    GL gl;
+    private readonly GL _gl;
 
-    public GLRenderTarget(GL gl, uint handle, IImage[]? color, IImage? depthStencil)
+    public GLRenderTarget(GL gl, IImage[]? color, IImage? depthStencil)
     {
-        this.gl = gl;
-        Handle = handle;
+        _gl = gl;
+        Handle = _gl.GenFramebuffer();
+
+        _gl.BindFramebuffer(FramebufferTarget.Framebuffer, Handle);
+
+        if (color != null)
+        {
+            for (int i = 0; i < color.Length; i++)
+            {
+                GLImage colorImage = (GLImage)color[i];
+                _gl.FramebufferTexture2D(FramebufferTarget.Framebuffer, FramebufferAttachment.ColorAttachment0 + i, colorImage.Target, colorImage.Handle, 0);
+            }
+        }
+
+        if (depthStencil != null)
+        {
+            GLImage depthImage = (GLImage)depthStencil;
+            _gl.FramebufferTexture2D(FramebufferTarget.Framebuffer, FramebufferAttachment.DepthStencilAttachment, depthImage.Target, depthImage.Handle, 0);
+        }
+
+        GLEnum status = _gl.CheckFramebufferStatus(FramebufferTarget.Framebuffer);
+        
+        if (status != GLEnum.FramebufferComplete)
+        {
+            _gl.DeleteFramebuffer(Handle);
+            throw new InvalidOperationException("Framebuffer incomplete: " + status);
+        }
+
         Color = color;
         DepthStencil = depthStencil;
     }
@@ -27,7 +50,7 @@ internal class GLRenderTarget : Disposable, IRenderTarget
     {
         if (disposing)
         {
-            gl.DeleteFramebuffer(Handle);
+            _gl.DeleteFramebuffer(Handle);
         }
     }
 }

@@ -48,7 +48,7 @@ public class TestGame : Game
 
     private UIManager uiManager;
 
-    public TestGame() : base(GraphicsBackend.OpenGL46, false)
+    public TestGame() : base(GraphicsBackend.OpenGL, false)
     {
         Window.SetVsyncMode(false);
     }

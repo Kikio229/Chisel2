@@ -1,138 +1,117 @@
-﻿using Silk.NET.OpenGL;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using System;
+using Silk.NET.OpenGL;
 
 namespace Chisel.Framework;
+
 internal class GLGraphicsState : Disposable, IGraphicsState
 {
-    internal uint ProgramHandle { get; }
+    internal uint Handle { get; set; } // We need to make a dummy default state later on
     internal PrimitiveType Topology { get; }
-    internal bool DepthTestEnabled { get; }
     internal DepthFunction DepthFunc { get; }
-    internal bool DepthWriteEnabled { get; }
-    internal bool BlendEnabled { get; }
     internal BlendingFactor BlendSrcFactor { get; }
     internal BlendingFactor BlendDstFactor { get; }
     internal BlendEquationModeEXT BlendEquation { get; }
-    internal bool CullEnabled { get; }
     internal TriangleFace CullFace { get; }
     internal PolygonMode FillMode { get; }
+    internal bool DepthTestEnabled { get; }
+    internal bool DepthWriteEnabled { get; }
+    internal bool BlendEnabled { get; }
+    internal bool CullEnabled { get; }
 
-    GL gl;
+    private readonly GL _gl;
 
-    public GLGraphicsState(GL gl, uint programHandle, GraphicsStateDescription description)
+    public GLGraphicsState(GL gl, GraphicsStateDescription desc, bool defaultState)
     {
-        this.gl = gl;
-        ProgramHandle = programHandle;
-        Topology = TranslateTopology(description.Topology);
+        _gl = gl;
+        Handle = 0;
 
-        (bool depthEnabled, DepthFunction depthFunc) = TranslateDepthMode(description.DepthMode);
-        DepthTestEnabled = depthEnabled;
+        if (!defaultState)
+        {
+            Handle = _gl.CreateProgram();
+
+            GLShader vert = (GLShader)desc.VertexShader!;
+            GLShader frag = (GLShader)desc.PixelShader!;
+
+            if (vert != null)
+            {
+                _gl.AttachShader(Handle, vert.Handle);
+            }
+
+            if (frag != null)
+            {
+                _gl.AttachShader(Handle, frag.Handle);
+            }
+
+            _gl.LinkProgram(Handle);
+            _gl.GetProgram(Handle, ProgramPropertyARB.LinkStatus, out int linkStatus);
+
+            if (linkStatus == 0)
+            {
+                string log = _gl.GetProgramInfoLog(Handle);
+                _gl.DeleteProgram(Handle);
+                throw new InvalidOperationException("Failed to link GL program: " + log);
+            }
+
+            // Apparently GL is weird, so we have to do whatever tf this is:
+            _gl.UseProgram(Handle);
+            BindReflectedSlots(Handle, vert!);
+            BindReflectedSlots(Handle, frag!);
+            _gl.UseProgram(0);
+        }
+
+        (bool depthEnabled, DepthFunction depthFunc) = GLUtilities.GetNativeDepthMode(desc.DepthMode);
+        (bool blendEnabled, BlendingFactor src, BlendingFactor dst, BlendEquationModeEXT eq) = GLUtilities.GetNativeBlendMode(desc.BlendMode);
+        (bool cullEnabled, TriangleFace cullFace) = GLUtilities.GetNativeCullMode(desc.CullMode);
+
+        Topology = GLUtilities.GetNativeTopologyMode(desc.Topology);
         DepthFunc = depthFunc;
-        DepthWriteEnabled = description.AllowDepthWrite;
-
-        (bool blendEnabled, BlendingFactor src, BlendingFactor dst, BlendEquationModeEXT eq) = TranslateBlendMode(description.BlendMode);
-        BlendEnabled = blendEnabled;
         BlendSrcFactor = src;
         BlendDstFactor = dst;
         BlendEquation = eq;
-
-        (bool cullEnabled, TriangleFace cullFace) = TranslateCullMode(description.CullMode);
-        CullEnabled = cullEnabled;
         CullFace = cullFace;
+        FillMode = GLUtilities.GetNativeFillMode(desc.FillMode);
 
-        FillMode = TranslateFillMode(description.FillMode);
+        DepthTestEnabled = depthEnabled;
+        DepthWriteEnabled = desc.AllowDepthWrite;
+        BlendEnabled = blendEnabled;
+        CullEnabled = cullEnabled;
     }
 
-    static PrimitiveType TranslateTopology(GraphicsTopology topology)
+    private void BindReflectedSlots(uint handle, IShader shader)
     {
-        switch (topology)
+        if (shader == null)
         {
-            case GraphicsTopology.TriangleList:
-                return PrimitiveType.Triangles;
-            case GraphicsTopology.TriangleStrip:
-                return PrimitiveType.TriangleStrip;
-            case GraphicsTopology.LineList:
-                return PrimitiveType.Lines;
-            case GraphicsTopology.LineStrip:
-                return PrimitiveType.LineStrip;
-            case GraphicsTopology.PointList:
-                return PrimitiveType.Points;
-            default:
-                throw new ArgumentOutOfRangeException(nameof(topology));
+            return;
         }
-    }
 
-    static (bool, DepthFunction) TranslateDepthMode(GraphicsDepthMode mode)
-    {
-        switch (mode)
+        ShaderReflection reflection = shader.Reflection;
+
+        // We have to kinda hack the uniforms
+        foreach (CbufferReflection b in reflection.Cbuffers)
         {
-            case GraphicsDepthMode.Disabled:
-                return (false, DepthFunction.Always);
-            case GraphicsDepthMode.Less:
-                return (true, DepthFunction.Less);
-            case GraphicsDepthMode.LessOrEqual:
-                return (true, DepthFunction.Lequal);
-            case GraphicsDepthMode.Equal:
-                return (true, DepthFunction.Equal);
-            case GraphicsDepthMode.Greater:
-                return (true, DepthFunction.Greater);
-            case GraphicsDepthMode.GreaterOrEqual:
-                return (true, DepthFunction.Gequal);
-            case GraphicsDepthMode.Always:
-                return (true, DepthFunction.Always);
-            case GraphicsDepthMode.Never:
-                return (true, DepthFunction.Never);
-            default:
-                throw new ArgumentOutOfRangeException(nameof(mode));
+            uint blockIndex = _gl.GetUniformBlockIndex(handle, b.Name);
+
+            // I think that's the error code anyway
+            if (blockIndex != uint.MaxValue)
+            {
+                _gl.UniformBlockBinding(handle, blockIndex, b.Slot);
+            }
         }
-    }
 
-    static (bool, BlendingFactor, BlendingFactor, BlendEquationModeEXT) TranslateBlendMode(GraphicsBlendMode mode)
-    {
-        switch (mode)
+        foreach (ResourceReflection s in reflection.Samplers)
         {
-            case GraphicsBlendMode.Opaque:
-                return (false, BlendingFactor.One, BlendingFactor.Zero, BlendEquationModeEXT.FuncAdd);
-            case GraphicsBlendMode.Alpha:
-                return (true, BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha, BlendEquationModeEXT.FuncAdd);
-            case GraphicsBlendMode.Additive:
-                return (true, BlendingFactor.SrcAlpha, BlendingFactor.One, BlendEquationModeEXT.FuncAdd);
-            case GraphicsBlendMode.Multiply:
-                return (true, BlendingFactor.DstColor, BlendingFactor.Zero, BlendEquationModeEXT.FuncAdd);
-            default:
-                throw new ArgumentOutOfRangeException(nameof(mode));
-        }
-    }
+            string name = s.CompiledName ?? s.Name;
+            int location = _gl.GetUniformLocation(handle, name);
 
-    static (bool, TriangleFace) TranslateCullMode(GraphicsCullMode mode)
-    {
-        switch (mode)
-        {
-            case GraphicsCullMode.None:
-                return (false, TriangleFace.Back);
-            case GraphicsCullMode.Front:
-                return (true, TriangleFace.Front);
-            case GraphicsCullMode.Back:
-                return (true, TriangleFace.Back);
-            default:
-                throw new ArgumentOutOfRangeException(nameof(mode));
-        }
-    }
+            if (Game.Instance?.Window.IsDebug ?? false)
+            {
+                Logger.AppendInfo($"Bound to named GL sampler: {s.CompiledName}");
+            }
 
-    static PolygonMode TranslateFillMode(GraphicsFillMode mode)
-    {
-        switch (mode)
-        {
-            case GraphicsFillMode.Solid:
-                return PolygonMode.Fill;
-            case GraphicsFillMode.Wireframe:
-                return PolygonMode.Line;
-            default:
-                throw new ArgumentOutOfRangeException(nameof(mode));
+            if (location >= 0)
+            {
+                _gl.Uniform1(location, (int)s.Slot);
+            }
         }
     }
 
@@ -140,7 +119,7 @@ internal class GLGraphicsState : Disposable, IGraphicsState
     {
         if (disposing)
         {
-            gl.DeleteProgram(ProgramHandle);
+            _gl.DeleteProgram(Handle);
         }
     }
 }

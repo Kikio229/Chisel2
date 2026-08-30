@@ -1,5 +1,8 @@
-﻿namespace Chisel.Framework;
+﻿using System;
+
+namespace Chisel.Framework;
+
 public interface IMaterialTable
 {
-    // mayonaise...
+    IImage[] Textures { get; }
 }

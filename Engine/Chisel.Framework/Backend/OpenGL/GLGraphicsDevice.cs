@@ -1,144 +1,76 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Hexa.NET.SDL3;
 using Silk.NET.OpenGL;
 
 namespace Chisel.Framework;
 
-public class GLGraphicsDevice : Disposable, IGraphicsDevice
+public partial class GLGraphicsDevice : Disposable, IGraphicsDevice
 {
-    // fuckin windows... I'm not, but windows is weird
-#if WINDOWS
-    [DllImport("kernel32.dll", CharSet = CharSet.Ansi, ExactSpelling = true)]
-    static extern nint GetModuleHandleA(string moduleName);
-
-    [DllImport("kernel32.dll", CharSet = CharSet.Ansi, ExactSpelling = true)]
-    static extern nint GetProcAddress(nint module, string procName);
-#endif
-
-    public GraphicsBackend Backend => GraphicsBackend.OpenGL; 
-    // this doesnt really matter on GL
     public uint FrameIndex => 0;
-    public uint BufferingCount => 2;
-
-    internal GL gl;
-    internal SDLGLContext glCTX;
-    internal GLGraphicsState currentState; // To avoid duplicate state changes
-    DebugProc debugCallback;
-
-    private Dictionary<(uint bufferHandle, VertexLayoutDescription layout), uint> vaoCache = new();
-    private Dictionary<uint, uint> vertexBufferSlots = new Dictionary<uint, uint>();
-    private uint currentVaoInUse;
-
-    private uint[] boundTextureBySlot = new uint[16];
-    private uint[] boundSamplerBySlot = new uint[16];
-
-    private Rectangle currentViewport;
-
-    private static readonly ImageFormat[] _backBufferColorFormats = { ImageFormat.R8G8B8A8UNorm };
-    private ImageFormat[] _currentColorFormats = _backBufferColorFormats;
-    private ImageFormat? _currentDepthStencilFormat;
-    private uint _currentSampleCount = 1;
-
+    public uint SampleCount => _currentSampleCount;
+    public uint BufferCount => 2;
+    public GraphicsBackend Backend => GraphicsBackend.OpenGL;
     public ImageFormat[] ColorFormats => _currentColorFormats;
     public ImageFormat? DepthStencilFormat => _currentDepthStencilFormat;
-    public uint SampleCount => _currentSampleCount;
-    private void ResetToBackBufferFormats()
-    {
-        _currentColorFormats = _backBufferColorFormats;
-        _currentDepthStencilFormat = null;
-        _currentSampleCount = 1;
-    }
 
-    static unsafe nint LoadGLFunction(string name)
-    {
-        nint address = (nint)SDL.GLGetProcAddress(name);
+    internal GL _gl;
+    internal SDLGLContext _glContext;
+    internal GLGraphicsState _currentState; // To avoid duplicate state changes
 
-#if WINDOWS
-        if (address == 0)
-        {
-            nint module = GetModuleHandleA("opengl32.dll");
-            address = GetProcAddress(module, name);
-        }
-#endif
+    private uint _currentVao, _currentSampleCount;
+    private uint[] _boundTextureBySlot = new uint[16];
+    private uint[] _boundSamplerBySlot = new uint[16];
+    private Dictionary<(uint bufferHandle, VertexLayoutDescription layout), uint> _vaoCache = new();
+    private Dictionary<uint, uint> _vbufferSlots = new Dictionary<uint, uint>();
+    private bool _isDebug;
 
-        return address;
-    }
+    private DebugProc _debugCallback;
+    private Rectangle _currentViewport;
+    private ImageFormat[] _currentColorFormats = _backBufferColorFormats;
+    private ImageFormat? _currentDepthStencilFormat;
+    private static readonly ImageFormat[] _backBufferColorFormats = { ImageFormat.R8G8B8A8UNorm };
 
     public unsafe GLGraphicsDevice(SDLGLContext context, bool debug)
     {
-        glCTX = context;
-        gl = GL.GetApi(LoadGLFunction);
+        _glContext = context;
+        _gl = GL.GetApi(UtilLoadGLFunction);
+        _isDebug = debug;
 
-        string version = gl.GetStringS(StringName.Version);
+        string version = _gl.GetStringS(StringName.Version);
 
         if (string.IsNullOrEmpty(version))
         {
             throw new InvalidOperationException("Failed to load OpenGL functions - is a context current?");
         }
 
-        Logger.AppendLog("GL", "Successfully initialized OpenGL " + version, ConsoleColor.DarkCyan, 1);
-
-        if (debug)
+        if (_isDebug)
         {
-            InitDebug();
+            if (!UtilHasExtension("GL_KHR_debug"))
+            {
+                Logger.AppendWarn("GL debug output requested, but GL_KHR_debug is not supported by this driver.");
+                return;
+            }
+
+            _debugCallback = UtilOnDebugMessage;
+
+            _gl.Enable(EnableCap.DebugOutput);
+            _gl.Enable(EnableCap.DebugOutputSynchronous);
+            _gl.DebugMessageCallback(_debugCallback, null);
         }
 
         SDL.GLSetSwapInterval(Game.Instance!.Window.IsVsyncOn ? 1 : 0);
-
-        // Default state
-        currentState = new GLGraphicsState(gl, 0, new GraphicsStateDescription());
-        GC.SuppressFinalize(currentState); // GC was randomly gobbling it up
+        _currentState = new GLGraphicsState(_gl, new GraphicsStateDescription(), true); // Default state
+        GC.SuppressFinalize(_currentState); // GC was randomly gobbling it up
+        Logger.AppendLog("GL", "Successfully initialized OpenGL " + version, ConsoleColor.DarkCyan, 1);
     }
 
-    unsafe void InitDebug()
+    public void BeginFrame()
     {
-        if (!HasExtension("GL_KHR_debug"))
-        {
-            Logger.AppendWarn("GL debug output requested, but GL_KHR_debug is not supported by this driver.");
-            return;
-        }
-
-        debugCallback = OnDebugMessage;
-
-        gl.Enable(EnableCap.DebugOutput);
-        gl.Enable(EnableCap.DebugOutputSynchronous);
-        gl.DebugMessageCallback(debugCallback, null);
-    }
-
-    private void OnDebugMessage(GLEnum source, GLEnum type, int id, GLEnum severity, int length, nint message, nint userParam)
-    {
-        if (severity == GLEnum.DebugSeverityNotification)
-        {
-            return;
-        }
-
-        string text = Marshal.PtrToStringUTF8(message, length);
-        Logger.AppendLog("GL", text, ConsoleColor.DarkCyan, 1);
-    }
-
-    bool HasExtension(string name)
-    {
-        gl.GetInteger(GLEnum.NumExtensions, out int count);
-
-        for (uint i = 0; i < count; i++)
-        {
-            string extension = gl.GetStringS(StringName.Extensions, i);
-
-            if (string.Equals(extension, name, StringComparison.Ordinal))
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    public unsafe void BeginFrame()
-    {
-        gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
-        ResetToBackBufferFormats();
+        _gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
+        UtilResetToBackBufferFormats();
     }
 
     public unsafe void EndFrame()
@@ -149,87 +81,30 @@ public class GLGraphicsDevice : Disposable, IGraphicsDevice
 
     public void BeginDrawing(IRenderTarget target)
     {
-        // I've decided to auto-size the viewport when doing this. Seems like a good idea.
-        if (target is GLRenderTarget glTarget)
+        if (target is not GLRenderTarget glTarget)
         {
-            gl.BindFramebuffer(FramebufferTarget.Framebuffer, glTarget.Handle);
-
-            IImage sizeSource = glTarget.Color != null && glTarget.Color.Length > 0 ? glTarget.Color[0] : glTarget.DepthStencil;
-
-            if (sizeSource != null)
-            {
-                gl.Viewport(0, 0, sizeSource.Width, sizeSource.Height);
-            }
-
-            _currentColorFormats = glTarget.Color is { Length: > 0 }
-                ? Array.ConvertAll(glTarget.Color, c => c.Format)
-                : Array.Empty<ImageFormat>();
-            _currentDepthStencilFormat = glTarget.DepthStencil?.Format;
-            _currentSampleCount = glTarget.Color is { Length: > 0 } ? ((GLImage)glTarget.Color[0]).SampleCount
-                : (glTarget.DepthStencil is GLImage depthImg ? depthImg.SampleCount : 1);
+            _gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
+            UtilResetToBackBufferFormats();
+            return;
         }
-        else
-        {
-            gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
-            ResetToBackBufferFormats();
-        }
+
+        _gl.BindFramebuffer(FramebufferTarget.Framebuffer, glTarget.Handle);
+
+        _currentColorFormats = (glTarget.Color!.Length > 0)
+            ? Array.ConvertAll(glTarget.Color, c => c.Format)
+            : Array.Empty<ImageFormat>();
+
+        _currentDepthStencilFormat = glTarget.DepthStencil?.Format;
+        _currentSampleCount = (glTarget.Color!.Length > 0) ?
+            ((GLImage)glTarget.Color[0]).SampleCount : 
+                (glTarget.DepthStencil is GLImage glDepth ? 
+                glDepth.SampleCount : 1);
     }
 
     public void EndDrawing()
     {
-        gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
-        ResetToBackBufferFormats();
-    }
-
-    public void Draw(uint vtxCount)
-    {
-        gl.DrawArrays(currentState.Topology, 0, (uint)vtxCount);
-    }
-
-    public unsafe void DrawIndexed(uint idxCount)
-    {
-        gl.DrawElements(currentState.Topology, (uint)idxCount, DrawElementsType.UnsignedInt, null);
-    }
-
-    public unsafe void DrawIndexed(uint idxCount, uint startIndex, int baseVertex)
-    {
-        gl.DrawElementsBaseVertex(currentState.Topology, idxCount, DrawElementsType.UnsignedInt,
-            (void*)(startIndex * sizeof(uint)), baseVertex);
-    }
-
-    public void DrawInstanced(uint vtxCount, uint instCount)
-    {
-        gl.DrawArraysInstanced(currentState.Topology, 0, vtxCount, instCount);
-    }
-
-    public void DrawIndexedInstanced(uint idxCount, uint instCount)
-    {
-        DrawIndexedInstanced(idxCount, instCount, 0, 0);
-    }
-
-    public void DrawIndexedInstanced(uint idxCount, uint instCount, uint startIndex, int baseVertex)
-    {
-        // I think the input sig is wrong for this
-    }
-
-    public void DrawIndirect(IBuffer buffer, ulong offset, uint drawCount, uint stride)
-    {
-
-    }
-
-    public void DrawIndexedIndirect(IBuffer buffer, ulong offset, uint drawCount, uint stride)
-    {
-
-    }
-
-    public void Dispatch(uint groupX, uint groupY, uint groupZ)
-    {
-
-    }
-
-    public void DispatchIndirect(IBuffer buffer, ulong offset)
-    {
-
+        _gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
+        UtilResetToBackBufferFormats();
     }
 
     public void Clear(Color clearColor)
@@ -240,134 +115,182 @@ public class GLGraphicsDevice : Disposable, IGraphicsDevice
     public void Clear(Color clearColor, float clearDepth, int clearStencil, GraphicsClearFlags flags)
     {
         Vector4 cc = clearColor.ToVector4Normalized();
-        gl.ClearColor(cc.X, cc.Y, cc.Z, cc.W);
-        gl.ClearDepth(clearDepth);
-        gl.ClearStencil(clearStencil);
-
-        bool clearingDepth = flags.HasFlag(GraphicsClearFlags.Depth);
-
-        if (clearingDepth)
-        {
-            gl.DepthMask(true);
-        }
+        _gl.ClearColor(cc.X, cc.Y, cc.Z, cc.W);
+        _gl.ClearDepth(clearDepth);
+        _gl.ClearStencil(clearStencil);
 
         ClearBufferMask mask = ClearBufferMask.None;
-        if (flags.HasFlag(GraphicsClearFlags.Color)) mask |= ClearBufferMask.ColorBufferBit;
-        if (clearingDepth) mask |= ClearBufferMask.DepthBufferBit;
-        if (flags.HasFlag(GraphicsClearFlags.Stencil)) mask |= ClearBufferMask.StencilBufferBit;
+        bool depthClear = flags.HasFlag(GraphicsClearFlags.Depth);
 
-        gl.Clear(mask);
-
-        if (clearingDepth)
+        if (flags.HasFlag(GraphicsClearFlags.Color))
         {
-            gl.DepthMask(currentState.DepthWriteEnabled);
+            mask |= ClearBufferMask.ColorBufferBit;
+        }
+
+        if (flags.HasFlag(GraphicsClearFlags.Stencil))
+        {
+            mask |= ClearBufferMask.StencilBufferBit;
+        }
+
+        if (depthClear)
+        {
+            _gl.DepthMask(true);
+            mask |= ClearBufferMask.DepthBufferBit;
+        }
+
+        _gl.Clear(mask);
+
+        if (depthClear)
+        {
+            _gl.DepthMask(_currentState.DepthWriteEnabled);
         }
     }
 
-    public void Resize(int w, int h)
+    public void Resize(int width, int height)
     {
-        // GL dont care
+        _gl.Viewport(0, 0, (uint)width, (uint)height);
+    }
+
+    public void Draw(uint vertexCount)
+    {
+        _gl.DrawArrays(_currentState.Topology, 0, (uint)vertexCount);
+    }
+
+    public void DrawIndexed(uint indexCount)
+    {
+        DrawIndexed(indexCount, 0, 0);
+    }
+
+    public unsafe void DrawIndexed(uint indexCount, uint startIndex, int baseVertex)
+    {
+        _gl.DrawElementsBaseVertex(_currentState.Topology, indexCount, DrawElementsType.UnsignedInt, (void*)(startIndex * sizeof(uint)), baseVertex);
+    }
+
+    public void DrawInstanced(uint vertexCount, uint instCount)
+    {
+        _gl.DrawArraysInstanced(_currentState.Topology, 0, vertexCount, instCount);
+    }
+
+    public void DrawIndexedInstanced(uint indexCount, uint instCount)
+    {
+        DrawIndexedInstanced(indexCount, instCount, 0, 0);
+    }
+
+    public unsafe void DrawIndexedInstanced(uint indexCount, uint instCount, uint startIndex, int baseVertex)
+    {
+        _gl.DrawElementsInstanced(_currentState.Topology, indexCount, DrawElementsType.UnsignedInt, (void*)(startIndex * sizeof(uint)), instCount);
+    }
+
+    public void DrawIndirect(IBuffer buffer, ulong offset, uint drawCount, uint stride)
+    {
+        throw new NotImplementedException();
+    }
+
+    public void DrawIndexedIndirect(IBuffer buffer, ulong offset, uint drawCount, uint stride)
+    {
+        throw new NotImplementedException();
+    }
+
+    public void Dispatch(uint groupX, uint groupY, uint groupZ)
+    {
+        throw new NotImplementedException();
+    }
+
+    public void DispatchIndirect(IBuffer buffer, ulong offset)
+    {
+        throw new NotImplementedException();
     }
 
     public void SetViewport(Vector2 position, Vector2 size)
     {
-        gl.Viewport((int)position.X, (int)position.Y, (uint)size.X, (uint)size.Y);
-        currentViewport = new Rectangle((int)position.X, (int)position.Y, (int)size.X, (int)size.Y);
+        _gl.Viewport((int)position.X, (int)position.Y, (uint)size.X, (uint)size.Y);
+        _currentViewport = new Rectangle((int)position.X, (int)position.Y, (int)size.X, (int)size.Y);
     }
 
     public void SetScissor(Vector2 position, Vector2 size)
     {
-        gl.Enable(EnableCap.ScissorTest);
-        gl.Scissor((int)position.X, (int)position.Y, (uint)size.X, (uint)size.Y);
+        _gl.Enable(EnableCap.ScissorTest);
+        _gl.Scissor((int)position.X, (int)position.Y, (uint)size.X, (uint)size.Y);
     }
 
     public void SetScissorEnabled(bool enabled)
     {
-        if (enabled) gl.Enable(EnableCap.ScissorTest);
-        else gl.Disable(EnableCap.ScissorTest);
+        if (enabled)
+        {
+            _gl.Enable(EnableCap.ScissorTest);
+        }
+        else
+        {
+            _gl.Disable(EnableCap.ScissorTest);
+        }
     }
 
-    public void GenerateMipmaps(IImage image, ReadOnlySpan<byte> baseLevelData)
-    {
-        GLImage glImage = (GLImage)image;
-        if (glImage.MipLevels <= 1) return;
-
-        gl.BindTexture(glImage.Target, glImage.Handle);
-        gl.GenerateMipmap(glImage.Target);
-    }
-
-    public void SetConstants<T>(in T value, uint slot) 
+    public void SetConstants<T>(in T value, uint slot)
         where T : unmanaged
     {
         throw new NotImplementedException("Not implemented in GL");
     }
 
-    public void BindVertexBuffer(IBuffer buffer, uint slot)
-    {
-        GLBuffer glBuffer = (GLBuffer)buffer;
-        vertexBufferSlots[slot] = glBuffer.Handle;
-    }
-
     public unsafe void SetVertexLayout(VertexLayoutDescription layout, uint slot)
     {
-        if (!vertexBufferSlots.TryGetValue(slot, out uint bufferHandle))
+        if (!_vbufferSlots.TryGetValue(slot, out uint bufferHandle))
         {
             throw new InvalidOperationException("No vertex buffer bound to slot " + slot + " before SetVertexLayout.");
         }
 
         var key = (bufferHandle, layout);
 
-        if (vaoCache.TryGetValue(key, out uint cachedVao))
+        if (_vaoCache.TryGetValue(key, out uint cachedVao))
         {
-            gl.BindVertexArray(cachedVao);
-            return; // attributes are already configured on this VAO from when it was built
+            _gl.BindVertexArray(cachedVao);
+            return; // as are already configured on this VAO from when it was built
         }
 
-        uint newVao = gl.GenVertexArray();
-        gl.BindVertexArray(newVao);
-        gl.BindBuffer(BufferTargetARB.ArrayBuffer, bufferHandle);
+        uint newVao = _gl.GenVertexArray();
+        _gl.BindVertexArray(newVao);
+        _gl.BindBuffer(BufferTargetARB.ArrayBuffer, bufferHandle);
 
-        foreach (VertexAttributeDescription attribute in layout.Attributes)
+        foreach (VertexAttributeDescription a in layout.Attributes)
         {
-            int count = GetComponentCount(attribute.Format);
+            int count = GLUtilities.GetNativeComponentCount(a.Format);
 
-            if (IsIntegerFormat(attribute.Format))
+            if (GLUtilities.GetNativeIsIntegerFormat(a.Format))
             {
-                gl.VertexAttribIPointer(attribute.Location, count, GetIntegerType(attribute.Format), (uint)layout.Stride, (void*)attribute.Offset);
+                _gl.VertexAttribIPointer(a.Location, count, GLUtilities.GetNativeIntegerType(a.Format), (uint)layout.Stride, (void*)a.Offset);
             }
             else
             {
-                gl.VertexAttribPointer(attribute.Location, count, VertexAttribPointerType.Float, false, (uint)layout.Stride, (void*)attribute.Offset);
+                _gl.VertexAttribPointer(a.Location, count, VertexAttribPointerType.Float, false, (uint)layout.Stride, (void*)a.Offset);
             }
 
-            gl.EnableVertexAttribArray(attribute.Location);
+            _gl.EnableVertexAttribArray(a.Location);
         }
 
-        vaoCache[key] = newVao;
-        currentVaoInUse = newVao;
+        _vaoCache[key] = newVao;
+        _currentVao = newVao;
+    }
+
+    public void BindVertexBuffer(IBuffer buffer, uint slot)
+    {
+        GLBuffer glBuffer = (GLBuffer)buffer;
+        _vbufferSlots[slot] = glBuffer.Handle;
     }
 
     public void BindIndexBuffer(IBuffer buffer)
     {
-        if (currentVaoInUse == 0)
-        {
-            throw new InvalidOperationException("BindIndexBuffer called before SetVertexLayout - there's no VAO bound yet to associate the index buffer with.");
-        }
-
         GLBuffer glBuffer = (GLBuffer)buffer;
-        gl.BindBuffer(BufferTargetARB.ElementArrayBuffer, glBuffer.Handle);
+        _gl.BindBuffer(BufferTargetARB.ElementArrayBuffer, glBuffer.Handle);
     }
 
     public void BindConstantBuffer(IBuffer buffer, uint slot)
     {
         GLBuffer glBuffer = (GLBuffer)buffer;
-        gl.BindBufferBase(BufferTargetARB.UniformBuffer, slot, glBuffer.Handle);
+        _gl.BindBufferBase(BufferTargetARB.UniformBuffer, slot, glBuffer.Handle);
     }
 
-
-    // GL is not magic yet
     public void BindConstantBuffer(IBuffer buffer, ulong offset, uint size, uint slot)
     {
+        // GL is not magic yet
         throw new NotImplementedException();
     }
 
@@ -378,609 +301,420 @@ public class GLGraphicsDevice : Disposable, IGraphicsDevice
 
     public void BindStorageBuffer(IBuffer buffer)
     {
-
+        throw new NotImplementedException();
     }
 
     public void BindImage(IImage image, uint slot)
     {
         GLImage glImage = (GLImage)image;
 
-        if (boundTextureBySlot[slot] == glImage.Handle)
+        if (_boundTextureBySlot[slot] == glImage.Handle)
         {
             return;
         }
 
-        gl.ActiveTexture(TextureUnit.Texture0 + (int)slot);
-        gl.BindTexture(TextureTarget.Texture2D, glImage.Handle);
-        boundTextureBySlot[slot] = glImage.Handle;
+        _gl.ActiveTexture(TextureUnit.Texture0 + (int)slot);
+        _gl.BindTexture(TextureTarget.Texture2D, glImage.Handle);
+        _boundTextureBySlot[slot] = glImage.Handle;
     }
 
     public void BindSampler(ISampler sampler, uint slot)
     {
         GLSampler glSampler = (GLSampler)sampler;
-        gl.BindSampler(slot, glSampler.Handle);
+        _gl.BindSampler(slot, glSampler.Handle);
     }
 
-    public void BindGraphicsState(IGraphicsState gfxState)
+    public void BindGraphicsState(IGraphicsState graphicsState)
     {
-        if(gfxState is not GLGraphicsState state)
+        if (graphicsState is not GLGraphicsState state)
         {
             Logger.AppendWarn("Cannot bind non-GL graphics state to GL device!");
             return;
         }
 
-        if (state.ProgramHandle != currentState.ProgramHandle)
+        if (state.Handle != _currentState.Handle)
         {
-            gl.UseProgram(state.ProgramHandle);
+            _gl.UseProgram(state.Handle);
         }
 
         // Depth
-        if (state.DepthTestEnabled && !currentState.DepthTestEnabled)
+        if (state.DepthTestEnabled && !_currentState.DepthTestEnabled)
         {
-            gl.Enable(EnableCap.DepthTest);
-            gl.DepthFunc(state.DepthFunc);
+            _gl.Enable(EnableCap.DepthTest);
+            _gl.DepthFunc(state.DepthFunc);
         }
-        else if(!state.DepthTestEnabled && currentState.DepthTestEnabled)
+        else if (!state.DepthTestEnabled && _currentState.DepthTestEnabled)
         {
-            gl.Disable(EnableCap.DepthTest);
+            _gl.Disable(EnableCap.DepthTest);
         }
 
         // Depth write
-        if (state.DepthWriteEnabled != currentState.DepthWriteEnabled)
+        if (state.DepthWriteEnabled != _currentState.DepthWriteEnabled)
         {
-            gl.DepthMask(state.DepthWriteEnabled);
+            _gl.DepthMask(state.DepthWriteEnabled);
         }
 
         // Blend
-        if (state.BlendEnabled && !currentState.BlendEnabled)
+        if (state.BlendEnabled && !_currentState.BlendEnabled)
         {
-            gl.Enable(EnableCap.Blend);
-            gl.BlendFunc(state.BlendSrcFactor, state.BlendDstFactor);
-            gl.BlendEquation(state.BlendEquation);
+            _gl.Enable(EnableCap.Blend);
+            _gl.BlendFunc(state.BlendSrcFactor, state.BlendDstFactor);
+            _gl.BlendEquation(state.BlendEquation);
         }
-        else if (!state.BlendEnabled && currentState.BlendEnabled)
+        else if (!state.BlendEnabled && _currentState.BlendEnabled)
         {
-            gl.Disable(EnableCap.Blend);
+            _gl.Disable(EnableCap.Blend);
         }
 
         // Cull
-        if (state.CullEnabled && !currentState.CullEnabled)
+        if (state.CullEnabled && !_currentState.CullEnabled)
         {
-            gl.Enable(EnableCap.CullFace);
-            gl.CullFace(state.CullFace);
+            _gl.Enable(EnableCap.CullFace);
+            _gl.CullFace(state.CullFace);
         }
-        else if (!state.CullEnabled && currentState.CullEnabled)
+        else if (!state.CullEnabled && _currentState.CullEnabled)
         {
-            gl.Disable(EnableCap.CullFace);
+            _gl.Disable(EnableCap.CullFace);
         }
 
         // Polygon mode
-        if (state.FillMode != currentState.FillMode)
+        if (state.FillMode != _currentState.FillMode)
         {
-            gl.PolygonMode(TriangleFace.FrontAndBack, state.FillMode);
+            _gl.PolygonMode(TriangleFace.FrontAndBack, state.FillMode);
         }
 
-        currentState = state;
+        _currentState = state;
     }
 
-    public void BindComputeState(IComputeState cmpState)
+    public void BindComputeState(IComputeState computeState)
     {
-
+        throw new NotImplementedException();
     }
 
     public void BindMaterialTable(IMaterialTable materialTable)
     {
-        GLMaterialTable table = (GLMaterialTable)materialTable;
+        GLMaterialTable glTable = (GLMaterialTable)materialTable;
 
-        for (uint i = 0; i < table.Textures.Length; i++)
+        for (uint i = 0; i < glTable.Textures.Length; i++)
         {
-            BindImage(table.Textures[i], i);
+            BindImage(glTable.Textures[i], i);
         }
-    }
-
-    public unsafe void CopyBuffer(IBuffer bufSrc, IBuffer bufDst)
-    {
-        GLBuffer glSrc = (GLBuffer)bufSrc;
-        GLBuffer glDst = (GLBuffer)bufDst;
-
-        gl.BindBuffer(BufferTargetARB.CopyWriteBuffer, glDst.Handle);
-        gl.BufferData((GLEnum)BufferTargetARB.CopyWriteBuffer, (nuint)glSrc.Size, null, (GLEnum)TranslateBufferTarget(glSrc.Usage));
-
-        gl.BindBuffer(BufferTargetARB.CopyReadBuffer, glSrc.Handle);
-        gl.CopyBufferSubData(CopyBufferSubDataTarget.CopyReadBuffer, CopyBufferSubDataTarget.CopyWriteBuffer, 0, 0, (nuint)glSrc.Size);
-    }
-
-    public unsafe void CopyBuffer(IBuffer bufSrc, IBuffer bufDst, BufferCopyRegion region)
-    {
-        throw new NotImplementedException("stub!!!");
-    }
-
-    public unsafe void CopyBufferToImage(IBuffer bufSrc, IImage imgDst)
-    {
-        GLBuffer glBuffer = (GLBuffer)bufSrc;
-        GLImage glImage = (GLImage)imgDst;
-
-        (_, PixelFormat pixelFormat, PixelType pixelType) = TranslateImageFormat(glImage.Format);
-
-        gl.BindBuffer(BufferTargetARB.PixelUnpackBuffer, glBuffer.Handle);
-        gl.BindTexture(TextureTarget.Texture2D, glImage.Handle);
-        gl.TexSubImage2D(TextureTarget.Texture2D, 0, 0, 0, glImage.Width, glImage.Height, pixelFormat, pixelType, null);
-        gl.BindBuffer(BufferTargetARB.PixelUnpackBuffer, 0);
-    }
-    public unsafe void CopyBufferToImage(IBuffer bufSrc, IImage imgDst, ImageBufferCopyRegion region)
-    {
-        GLBuffer glBuffer = (GLBuffer)bufSrc;
-        GLImage glImage = (GLImage)imgDst;
-
-        (_, PixelFormat pixelFormat, PixelType pixelType) = TranslateImageFormat(glImage.Format);
-
-        gl.BindBuffer(BufferTargetARB.PixelUnpackBuffer, glBuffer.Handle);
-        gl.BindTexture(TextureTarget.Texture2D, glImage.Handle);
-        gl.TexSubImage2D(TextureTarget.Texture2D, (int)region.ImgMipLevel, region.DstOffsetX, region.DstOffsetY, region.Width, region.Height, pixelFormat, pixelType, null);
-        gl.BindBuffer(BufferTargetARB.PixelUnpackBuffer, 0);
-    }
-
-    public void CopyImage(IImage imgSrc, IImage imgDst)
-    {
-        throw new NotImplementedException("TODO: Image copying is not implemented on either backend yet!");
-    }
-
-    public void CopyImage(IImage imgSrc, IImage imgDst, ImageCopyRegion region)
-    {
-        throw new NotImplementedException("TODO: Image copying is not implemented on either backend yet!");
-    }
-
-    public void CopyImageToBuffer(IImage imgSrc, IBuffer bufDst)
-    {
-        throw new NotImplementedException("TODO: Image copying to buffer is not implemented on either backend yet!");
-    }
-
-    public void CopyImageToBuffer(IImage imgSrc, IBuffer bufDst, ImageBufferCopyRegion region)
-    {
-        throw new NotImplementedException("TODO: Image copying to buffer is not implemented on either backend yet!");
-    }
-
-    public unsafe void ResolveImage(IImage src, IImage dst)
-    {
-        GLImage glSrc = (GLImage)src;
-        GLImage glDst = (GLImage)dst;
-
-        uint readFbo = gl.GenFramebuffer();
-        uint drawFbo = gl.GenFramebuffer();
-
-        gl.BindFramebuffer(FramebufferTarget.ReadFramebuffer, readFbo);
-        gl.FramebufferTexture2D(FramebufferTarget.ReadFramebuffer, FramebufferAttachment.ColorAttachment0, glSrc.Target, glSrc.Handle, 0);
-
-        gl.BindFramebuffer(FramebufferTarget.DrawFramebuffer, drawFbo);
-        gl.FramebufferTexture2D(FramebufferTarget.DrawFramebuffer, FramebufferAttachment.ColorAttachment0, glDst.Target, glDst.Handle, 0);
-
-        gl.BlitFramebuffer(0, 0, (int)glSrc.Width, (int)glSrc.Height, 0, 0, (int)glDst.Width, (int)glDst.Height,
-                                 ClearBufferMask.ColorBufferBit, BlitFramebufferFilter.Nearest);
-
-        gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
-        gl.DeleteFramebuffer(readFbo);
-        gl.DeleteFramebuffer(drawFbo);
-    }
-
-    public unsafe IBuffer CreateBuffer(BufferDescription bufDesc)
-    {
-        uint handle = gl.GenBuffer();
-        BufferTargetARB target = TranslateBufferTarget(bufDesc.Usage);
-        BufferUsageARB usageHint = TranslateUsageHint(bufDesc.Type);
-
-        gl.BindBuffer(target, handle);
-        gl.BufferData(target, (nuint)bufDesc.Size, null, usageHint);
-
-        return new GLBuffer(gl, handle, bufDesc.Size, bufDesc.Type, bufDesc.Usage);
-    }
-
-    public unsafe IImage CreateImage(ImageDescription imgDesc)
-    {
-        if (imgDesc.SampleCount > 1 && imgDesc.Usage.HasFlag(ImageUsage.Sampled))
-        {
-            throw new ArgumentException("Multisampled images cannot be sampled directly. Resolve to a single-sample image first.");
-        }
-
-        uint handle = gl.GenTexture();
-        TextureTarget target = imgDesc.SampleCount > 1 ? TextureTarget.Texture2DMultisample : TextureTarget.Texture2D;
-
-        gl.BindTexture(target, handle);
-
-        (InternalFormat internalFormat, PixelFormat pixelFormat, PixelType pixelType) = TranslateImageFormat(imgDesc.Format);
-
-        if (imgDesc.SampleCount > 1)
-        {
-            gl.TexImage2DMultisample(TextureTarget.Texture2DMultisample, imgDesc.SampleCount, internalFormat,
-                                                                   (uint)imgDesc.Width, (uint)imgDesc.Height, true);
-        }
-        else
-        {
-            gl.TexImage2D(target, 0, internalFormat, imgDesc.Width, imgDesc.Height, 0, pixelFormat, pixelType, null);
-            gl.TexParameter(target, TextureParameterName.TextureMinFilter, (int)GLEnum.Nearest);
-            gl.TexParameter(target, TextureParameterName.TextureMagFilter, (int)GLEnum.Nearest);
-        }
-
-        return new GLImage(gl, handle, imgDesc.Width, imgDesc.Height, imgDesc.MipLevels, imgDesc.Format, imgDesc.Usage, imgDesc.SampleCount, target);
-    }
-
-    public ISampler CreateSampler(SamplerDescription smpDesc)
-    {
-        uint handle = gl.GenSampler();
-
-        (TextureMinFilter minFilter, TextureMagFilter magFilter) = TranslateFilterMode(smpDesc.FilterMode);
-        GLEnum wrap = TranslateWrapMode(smpDesc.WrapMode);
-
-        gl.SamplerParameter(handle, SamplerParameterI.MinFilter, (int)minFilter);
-        gl.SamplerParameter(handle, SamplerParameterI.MagFilter, (int)magFilter);
-        gl.SamplerParameter(handle, SamplerParameterI.WrapS, (int)wrap);
-        gl.SamplerParameter(handle, SamplerParameterI.WrapT, (int)wrap);
-
-        return new GLSampler(gl, handle, smpDesc.DetailBias, smpDesc.FilterMode, smpDesc.WrapMode);
-    }
-
-    public IShader CreateShader(ShaderDescription shdDesc)
-    {
-        ShaderType stage = TranslateShaderStage(shdDesc.Stage);
-        uint handle = gl.CreateShader(stage);
-
-        // GL shaders are just strings
-        string source = System.Text.Encoding.UTF8.GetString(shdDesc.Bytecode.Span);
-        gl.ShaderSource(handle,source);
-        gl.CompileShader(handle);
-        gl.GetShader(handle, ShaderParameterName.CompileStatus, out int compileStatus);
-
-        if(compileStatus == 0)
-        {
-            string log = gl.GetShaderInfoLog(handle);
-            gl.DeleteShader(handle);
-            throw new InvalidOperationException("Failed to compile GL shader: " + log);
-        }
-
-        return new GLShader(gl,shdDesc.Entry,shdDesc.Stage, shdDesc.Reflection!.Value, handle);
-    }
-
-    public unsafe IRenderTarget CreateRenderTarget(RenderTargetDescription renDesc)
-    {
-        uint handle = gl.GenFramebuffer();
-        gl.BindFramebuffer(FramebufferTarget.Framebuffer, handle);
-
-        if (renDesc.Color != null)
-        {
-            for (int i = 0; i < renDesc.Color.Length; i++)
-            {
-                GLImage colorImage = (GLImage)renDesc.Color[i];
-                gl.FramebufferTexture2D(FramebufferTarget.Framebuffer, FramebufferAttachment.ColorAttachment0 + i, colorImage.Target, colorImage.Handle, 0);
-            }
-        }
-
-        if (renDesc.DepthStencil is GLImage depthImage)
-        {
-            gl.FramebufferTexture2D(FramebufferTarget.Framebuffer, FramebufferAttachment.DepthStencilAttachment, depthImage.Target, depthImage.Handle, 0);
-        }
-
-        GLEnum status = gl.CheckFramebufferStatus(FramebufferTarget.Framebuffer);
-
-        if (status != GLEnum.FramebufferComplete)
-        {
-            gl.DeleteFramebuffer(handle);
-            throw new InvalidOperationException("Framebuffer incomplete: " + status);
-        }
-
-        return new GLRenderTarget(gl, handle, renDesc.Color, renDesc.DepthStencil);
-    }
-
-    public IGraphicsState CreateGraphicsState(GraphicsStateDescription gfxDesc)
-    {
-        uint programHandle = gl.CreateProgram();
-
-        if(gfxDesc.VertexShader is GLShader vert)
-        {
-            gl.AttachShader(programHandle, vert.Handle);
-        }
-        else
-        {
-            Logger.AppendError("Attempted to bind a GL program to a non GL vertex shader!");
-        }
-
-        if (gfxDesc.PixelShader is GLShader frag)
-        {
-            gl.AttachShader(programHandle, frag.Handle);
-        }
-        else
-        {
-            Logger.AppendError("Attempted to bind a GL program to a non GL pixel shader!");
-        }
-
-        gl.LinkProgram(programHandle);
-        gl.GetProgram(programHandle,ProgramPropertyARB.LinkStatus, out int linkStatus);
-
-        if(linkStatus == 0)
-        {
-            string log = gl.GetProgramInfoLog(programHandle);
-            gl.DeleteProgram(programHandle);
-            throw new InvalidOperationException("Failed to link GL program: " + log);
-        }
-
-        // Apparently GL 3.3 is weird, so we have to do whatever tf this is:
-        gl.UseProgram(programHandle);
-        BindReflectedSlots(programHandle, gfxDesc.VertexShader);
-        BindReflectedSlots(programHandle, gfxDesc.PixelShader);
-        gl.UseProgram(0);
-
-        return new GLGraphicsState(gl,programHandle,gfxDesc);
-    }
-    public IMaterialTable CreateMaterialTable(IImage[] textures)
-    {
-        GLImage[] glTextures = new GLImage[textures.Length];
-
-        for (int i = 0; i < textures.Length; i++)
-        {
-            glTextures[i] = (GLImage)textures[i];
-        }
-
-        return new GLMaterialTable { Textures = glTextures };
-    }
-
-    void BindReflectedSlots(uint programHandle, IShader shader)
-    {
-        if (shader == null)
-        {
-            return;
-        }
-
-        ShaderReflection reflection = shader.Reflection;
-
-        // We have to kinda hack the uniforms
-        foreach (CbufferReflection cbuffer in reflection.Cbuffers)
-        {
-            uint blockIndex = gl.GetUniformBlockIndex(programHandle, cbuffer.Name);
-
-            // I think that's the error code anyway
-            if (blockIndex != uint.MaxValue)
-            {
-                gl.UniformBlockBinding(programHandle, blockIndex, cbuffer.Slot);
-            }
-        }
-
-        foreach (ResourceReflection sampler in reflection.Samplers)
-        {
-            string glName = sampler.CompiledName ?? sampler.Name;
-            int location = gl.GetUniformLocation(programHandle, glName);
-
-            if(Game.Instance?.Window.IsDebug ?? false)
-            {
-                Logger.AppendInfo($"Bound to named GL sampler: {sampler.CompiledName}");
-            }
-
-            if (location >= 0)
-            {
-                gl.Uniform1(location, (int)sampler.Slot);
-            }
-        }
-    }
-
-    public IComputeState CreateComputeState(ComputeStateDescription cmpDesc)
-    {
-        return null; // TODO
     }
 
     public unsafe void UpdateBuffer(IBuffer buffer, ReadOnlySpan<byte> data, ulong offset = 0)
     {
         GLBuffer glBuffer = (GLBuffer)buffer;
-        BufferTargetARB target = TranslateBufferTarget(glBuffer.Usage);
+        BufferTargetARB target = GLUtilities.GetNativeBufferTarget(glBuffer.Usage);
 
-        gl.BindBuffer(target, glBuffer.Handle);
+        _gl.BindBuffer(target, glBuffer.Handle);
 
         fixed (byte* ptr = data)
         {
-            gl.BufferSubData(target, (nint)offset, (nuint)data.Length, ptr);
+            _gl.BufferSubData(target, (nint)offset, (nuint)data.Length, ptr);
         }
     }
 
-    protected override unsafe void Dispose(bool disposing)
+    public unsafe void CopyBuffer(IBuffer bufferSrc, IBuffer bufferDst)
+    {
+        GLBuffer glSrc = (GLBuffer)bufferSrc;
+        GLBuffer glDst = (GLBuffer)bufferDst;
+
+        _gl.BindBuffer(BufferTargetARB.CopyWriteBuffer, glDst.Handle);
+        _gl.BufferData((GLEnum)BufferTargetARB.CopyWriteBuffer, (nuint)glSrc.Size, null, (GLEnum)GLUtilities.GetNativeBufferTarget(glSrc.Usage));
+
+        _gl.BindBuffer(BufferTargetARB.CopyReadBuffer, glSrc.Handle);
+        _gl.CopyBufferSubData(CopyBufferSubDataTarget.CopyReadBuffer, CopyBufferSubDataTarget.CopyWriteBuffer, 0, 0, (nuint)glSrc.Size);
+    }
+
+    public void CopyBuffer(IBuffer bufferSrc, IBuffer bufferDst, BufferCopyRegion region)
+    {
+        throw new NotImplementedException("stub!!!");
+    }
+
+    public unsafe void CopyBufferToImage(IBuffer bufferSrc, IImage imageDst)
+    {
+        GLBuffer glBuffer = (GLBuffer)bufferSrc;
+        GLImage glImage = (GLImage)imageDst;
+
+        (_, PixelFormat pixelFormat, PixelType pixelType) = GLUtilities.GetNativeImageFormat(glImage.Format);
+
+        _gl.BindBuffer(BufferTargetARB.PixelUnpackBuffer, glBuffer.Handle);
+        _gl.BindTexture(TextureTarget.Texture2D, glImage.Handle);
+        _gl.TexSubImage2D(TextureTarget.Texture2D, 0, 0, 0, glImage.Width, glImage.Height, pixelFormat, pixelType, null);
+        _gl.BindBuffer(BufferTargetARB.PixelUnpackBuffer, 0);
+    }
+
+    public unsafe void CopyBufferToImage(IBuffer bufferSrc, IImage imageDst, ImageBufferCopyRegion region)
+    {
+        GLBuffer glBuffer = (GLBuffer)bufferSrc;
+        GLImage glImage = (GLImage)imageDst;
+
+        (_, PixelFormat pixelFormat, PixelType pixelType) = GLUtilities.GetNativeImageFormat(glImage.Format);
+
+        _gl.BindBuffer(BufferTargetARB.PixelUnpackBuffer, glBuffer.Handle);
+        _gl.BindTexture(TextureTarget.Texture2D, glImage.Handle);
+        _gl.TexSubImage2D(TextureTarget.Texture2D, (int)region.ImgMipLevel, region.DstOffsetX, region.DstOffsetY, region.Width, region.Height, pixelFormat, pixelType, null);
+        _gl.BindBuffer(BufferTargetARB.PixelUnpackBuffer, 0);
+    }
+
+    public void ResolveImage(IImage imageSrc, IImage imageDst)
+    {
+        GLImage glSrc = (GLImage)imageSrc;
+        GLImage glDst = (GLImage)imageDst;
+
+        uint readFbo = _gl.GenFramebuffer();
+        uint drawFbo = _gl.GenFramebuffer();
+
+        _gl.BindFramebuffer(FramebufferTarget.ReadFramebuffer, readFbo);
+        _gl.FramebufferTexture2D(FramebufferTarget.ReadFramebuffer, FramebufferAttachment.ColorAttachment0, glSrc.Target, glSrc.Handle, 0);
+
+        _gl.BindFramebuffer(FramebufferTarget.DrawFramebuffer, drawFbo);
+        _gl.FramebufferTexture2D(FramebufferTarget.DrawFramebuffer, FramebufferAttachment.ColorAttachment0, glDst.Target, glDst.Handle, 0);
+
+        _gl.BlitFramebuffer(0, 0, (int)glSrc.Width, (int)glSrc.Height, 0, 0, (int)glDst.Width, (int)glDst.Height, ClearBufferMask.ColorBufferBit, BlitFramebufferFilter.Nearest);
+
+        _gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
+        _gl.DeleteFramebuffer(readFbo);
+        _gl.DeleteFramebuffer(drawFbo);
+    }
+
+    public void CopyImage(IImage imageSrc, IImage imageDst)
+    {
+        throw new NotImplementedException("TODO: Image copying is not implemented on either backend yet!");
+    }
+
+    public void CopyImage(IImage imageSrc, IImage imageDst, ImageCopyRegion region)
+    {
+        throw new NotImplementedException("TODO: Image copying is not implemented on either backend yet!");
+    }
+
+    public void CopyImageToBuffer(IImage imageSrc, IBuffer bufferDst)
+    {
+        throw new NotImplementedException("TODO: Image copying to buffer is not implemented on either backend yet!");
+    }
+
+    public void CopyImageToBuffer(IImage imageSrc, IBuffer bufferDst, ImageBufferCopyRegion region)
+    {
+        throw new NotImplementedException("TODO: Image copying to buffer is not implemented on either backend yet!");
+    }
+
+    public IBuffer CreateBuffer(BufferDescription bufferDesc)
+    {
+        const BufferUsage knownFlags = BufferUsage.Vertex | BufferUsage.Index | BufferUsage.Constant | BufferUsage.Storage | BufferUsage.Indirect | BufferUsage.CopySrc;
+
+        if (bufferDesc.Size == 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(bufferDesc), "Buffer size must be greater than zero!");
+        }
+
+        if ((bufferDesc.Usage & ~knownFlags) != 0 || (!Enum.IsDefined(bufferDesc.Type)))
+        {
+            throw new ArgumentOutOfRangeException(nameof(bufferDesc), bufferDesc.Usage, "Buffer usage is unknown or invalid!");
+        }
+
+        GLBuffer buffer = new GLBuffer(_gl, bufferDesc.Size, bufferDesc.Type, bufferDesc.Usage);
+        return (IBuffer)buffer;
+    }
+
+    public IImage CreateImage(ImageDescription imageDesc)
+    {
+        const ImageUsage knownFlags = ImageUsage.Sampled | ImageUsage.Storage | ImageUsage.RenderTarget | ImageUsage.DepthStencil;
+
+        if (imageDesc.Width == 0 || imageDesc.Height == 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(imageDesc), "Image dimensions must be greater than zero!");
+        }
+
+        if (imageDesc.MipLevels == 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(imageDesc), "Mipmap levels should be at least one!");
+        }
+
+        if ((imageDesc.Usage & ~knownFlags) != 0 || !Enum.IsDefined(imageDesc.Format))
+        {
+            throw new ArgumentOutOfRangeException("Image format is unknown or invalid!", nameof(imageDesc));
+        }
+
+        if (imageDesc.SampleCount > 1 && imageDesc.Usage.HasFlag(ImageUsage.Sampled))
+        {
+            throw new ArgumentException("Multisampled images cannot be sampled directly. Resolve to a single-sample image first!");
+        }
+
+        GLImage image = new GLImage(_gl, imageDesc.Width, imageDesc.Height, imageDesc.MipLevels, imageDesc.SampleCount, imageDesc.Format, imageDesc.Usage);
+        return (IImage)image;
+    }
+
+    public ISampler CreateSampler(SamplerDescription samplerDesc)
+    {
+        const SamplerFilterMode knownFlags = SamplerFilterMode.Bilinear | SamplerFilterMode.MipmapNearest | SamplerFilterMode.MipmapBilinear
+            | SamplerFilterMode.Anisotropic4x | SamplerFilterMode.Anisotropic8x | SamplerFilterMode.Anisotropic16x;
+
+        if ((samplerDesc.FilterMode & ~knownFlags) != 0 || !Enum.IsDefined(samplerDesc.WrapMode))
+        {
+            throw new ArgumentOutOfRangeException("Filter mode is unknown or invalid!", nameof(samplerDesc));
+        }
+
+        GLSampler sampler = new GLSampler(_gl, samplerDesc.DetailBias, samplerDesc.FilterMode, samplerDesc.WrapMode);
+        return (ISampler)sampler;
+    }
+
+    public IShader CreateShader(ShaderDescription shaderDesc)
+    {
+        if (string.IsNullOrWhiteSpace(shaderDesc.Entry) || shaderDesc.Bytecode.IsEmpty)
+        {
+            throw new ArgumentException("Shader cannot be missing data or empty!", nameof(shaderDesc));
+        }
+
+        if (!Enum.IsDefined(shaderDesc.Stage))
+        {
+            throw new ArgumentOutOfRangeException(nameof(shaderDesc), shaderDesc.Stage, "Shader stage is unknown or invalid!");
+        }
+
+        GLShader shader = new GLShader(_gl, shaderDesc.Entry, shaderDesc.Stage, shaderDesc.Reflection!.Value, shaderDesc.Bytecode.Span);
+        return (IShader)shader;
+    }
+
+    public IRenderTarget CreateRenderTarget(RenderTargetDescription targetDesc)
+    {
+        if (targetDesc.Color == null)
+        {
+            throw new ArgumentException("Color attachments cannot be null!", nameof(targetDesc));
+        }
+
+        if (targetDesc.Color.Length == 0 && targetDesc.DepthStencil == null)
+        {
+            throw new ArgumentException("A render target must have at least one attachment!", nameof(targetDesc));
+        }
+
+        GLRenderTarget target = new GLRenderTarget(_gl, targetDesc.Color, targetDesc.DepthStencil);
+        return (IRenderTarget)target;
+    }
+
+    public IGraphicsState CreateGraphicsState(GraphicsStateDescription graphicsDesc)
+    {
+        if (graphicsDesc.VertexShader != null && graphicsDesc.VertexShader.Stage != ShaderStage.Vertex)
+        {
+            throw new ArgumentException("A vertex shader state requires it to be a vertex stage!");
+        }
+
+        if (graphicsDesc.PixelShader != null && graphicsDesc.PixelShader.Stage != ShaderStage.Pixel)
+        {
+            throw new ArgumentException("A fragment shader state requires it to be a fragment stage!");
+        }
+
+        if ((graphicsDesc.VertexShader != null && graphicsDesc.VertexShader is not GLShader) || (graphicsDesc.PixelShader != null && graphicsDesc.PixelShader is not GLShader))
+        {
+            throw new ArgumentException("Shaders must be a GLShader created by this device!", nameof(graphicsDesc));
+        }
+
+        if (!Enum.IsDefined(graphicsDesc.Topology) || !Enum.IsDefined(graphicsDesc.DepthMode) || !Enum.IsDefined(graphicsDesc.BlendMode) ||
+            !Enum.IsDefined(graphicsDesc.CullMode) || !Enum.IsDefined(graphicsDesc.FillMode))
+        {
+            throw new ArgumentException("Provided rasterizer settings are unknown or invalid!");
+        }
+
+        GLGraphicsState state = new GLGraphicsState(_gl, graphicsDesc, false);
+        return (IGraphicsState)state;
+    }
+
+    public IComputeState CreateComputeState(ComputeStateDescription computeDesc)
+    {
+        throw new NotImplementedException();
+    }
+
+    public IMaterialTable CreateMaterialTable(MaterialTableDescription tableDesc)
+    {
+        GLImage[] glTextures = new GLImage[tableDesc.Textures!.Length];
+
+        for (int i = 0; i < tableDesc.Textures!.Length; i++)
+        {
+            glTextures[i] = (GLImage)tableDesc.Textures[i];
+        }
+
+        return new GLMaterialTable(tableDesc.Textures);
+    }
+    public void GenerateMipmaps(IImage image, ReadOnlySpan<byte> baseLevelData)
+    {
+        GLImage glImage = (GLImage)image;
+        if (glImage.MipLevels <= 1)
+        {
+            return;
+        }
+
+        _gl.BindTexture(glImage.Target, glImage.Handle);
+        _gl.GenerateMipmap(glImage.Target);
+    }
+
+    protected override void Dispose(bool disposing)
     {
         if (Backend == GraphicsBackend.OpenGL)
         {
-            SDL.GLDestroyContext(glCTX);
+            SDL.GLDestroyContext(_glContext);
         }
     }
 
+#region GL Util
 
-    // HELPERS
-    // vvvvvv
+    // Windows with GL is kinda silly
+#if WINDOWS
+    [LibraryImport("kernel32.dll", EntryPoint = "GetProcAddress", StringMarshalling = StringMarshalling.Utf8)]
+    [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+    private static partial nint UtilWinGetProcAddress(nint module, string name);
 
-    static (TextureMinFilter, TextureMagFilter) TranslateFilterMode(SamplerFilterMode mode)
+    [LibraryImport("kernel32.dll", EntryPoint = "GetModuleHandleA", StringMarshalling = StringMarshalling.Utf8)]
+    [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+    private static partial nint UtilWinGetModuleHandleA(string name);
+#endif
+
+    private void UtilOnDebugMessage(GLEnum source, GLEnum type, int id, GLEnum severity, int length, nint message, nint userParam)
     {
-        bool anisotropic = (mode & (SamplerFilterMode.Anisotropic4x | SamplerFilterMode.Anisotropic8x | SamplerFilterMode.Anisotropic16x)) != 0;
-        bool bilinear = anisotropic || (mode & SamplerFilterMode.Bilinear) != 0;
-
-        // Anisotropic doesnt exist here yet
-        bool mipLinear = anisotropic || (mode & SamplerFilterMode.MipmapBilinear) != 0;
-        bool mipNearest = !anisotropic && !mipLinear && (mode & SamplerFilterMode.MipmapNearest) != 0;
-
-        TextureMagFilter mag = bilinear ? TextureMagFilter.Linear : TextureMagFilter.Nearest;
-
-        TextureMinFilter min;
-        if (mipLinear)
+        if (severity == GLEnum.DebugSeverityNotification)
         {
-            min = bilinear ? TextureMinFilter.LinearMipmapLinear : TextureMinFilter.NearestMipmapLinear;
-        }
-        else if (mipNearest)
-        {
-            min = bilinear ? TextureMinFilter.LinearMipmapNearest : TextureMinFilter.NearestMipmapNearest;
-        }
-        else
-        {
-            min = bilinear ? TextureMinFilter.Linear : TextureMinFilter.Nearest;
+            return;
         }
 
-        return (min, mag);
+        string text = Marshal.PtrToStringUTF8(message, length);
+        Logger.AppendLog("GL", text, ConsoleColor.DarkCyan, 1);
     }
 
-    static GLEnum TranslateWrapMode(SamplerWrapMode mode)
+    private bool UtilHasExtension(string name)
     {
-        switch (mode)
-        {
-            case SamplerWrapMode.Repeat:
-                return GLEnum.Repeat;
-            case SamplerWrapMode.Clamp:
-                return GLEnum.ClampToEdge;
-            case SamplerWrapMode.Mirror:
-                return GLEnum.MirroredRepeat;
-            default:
-                throw new ArgumentOutOfRangeException(nameof(mode));
-        }
-    }
+        _gl.GetInteger(GLEnum.NumExtensions, out int count);
 
-    static (InternalFormat, PixelFormat, PixelType) TranslateImageFormat(ImageFormat format)
-    {
-        switch (format)
+        for (uint i = 0; i < count; i++)
         {
-            case ImageFormat.R8UNorm:
-                return (InternalFormat.R8, PixelFormat.Red, PixelType.UnsignedByte);
-            case ImageFormat.R8G8UNorm:
-                return (InternalFormat.RG8, PixelFormat.RG, PixelType.UnsignedByte);
-            case ImageFormat.R8G8B8A8UNorm:
-                return (InternalFormat.Rgba8, PixelFormat.Rgba, PixelType.UnsignedByte);
-            case ImageFormat.R8G8B8A8UNormSrgb:
-                return (InternalFormat.Srgb8Alpha8, PixelFormat.Rgba, PixelType.UnsignedByte);
-            case ImageFormat.R16UNorm:
-                return (InternalFormat.R16, PixelFormat.Red, PixelType.UnsignedShort);
-            case ImageFormat.R16G16UNorm:
-                return (InternalFormat.RG16, PixelFormat.RG, PixelType.UnsignedShort);
-            case ImageFormat.R16G16B16A16UNorm:
-                return (InternalFormat.Rgba16, PixelFormat.Rgba, PixelType.UnsignedShort);
-            case ImageFormat.R16Float:
-                return (InternalFormat.R16f, PixelFormat.Red, PixelType.HalfFloat);
-            case ImageFormat.R16G16Float:
-                return (InternalFormat.RG16f, PixelFormat.RG, PixelType.HalfFloat);
-            case ImageFormat.R16G16B16A16Float:
-                return (InternalFormat.Rgba16f, PixelFormat.Rgba, PixelType.HalfFloat);
-            case ImageFormat.R32Float:
-                return (InternalFormat.R32f, PixelFormat.Red, PixelType.Float);
-            case ImageFormat.R32G32Float:
-                return (InternalFormat.RG32f, PixelFormat.RG, PixelType.Float);
-            case ImageFormat.R32G32B32Float:
-                return (InternalFormat.Rgb32f, PixelFormat.Rgb, PixelType.Float);
-            case ImageFormat.R32G32B32A32Float:
-                return (InternalFormat.Rgba32f, PixelFormat.Rgba, PixelType.Float);
-            case ImageFormat.R32UInt:
-                return (InternalFormat.R32ui, PixelFormat.RedInteger, PixelType.UnsignedInt);
-            case ImageFormat.R32G32UInt:
-                return (InternalFormat.RG32ui, PixelFormat.RGInteger, PixelType.UnsignedInt);
-            case ImageFormat.R32G32B32UInt:
-                return (InternalFormat.Rgb32ui, PixelFormat.RgbInteger, PixelType.UnsignedInt);
-            case ImageFormat.R32G32B32A32UInt:
-                return (InternalFormat.Rgba32ui, PixelFormat.RgbaInteger, PixelType.UnsignedInt);
-            case ImageFormat.D16UNorm:
-                return (InternalFormat.DepthComponent16, PixelFormat.DepthComponent, PixelType.UnsignedShort);
-            case ImageFormat.D24UNormS8UInt:
-                return (InternalFormat.Depth24Stencil8, PixelFormat.DepthStencil, PixelType.UnsignedInt248);
-            case ImageFormat.D32Float:
-                return (InternalFormat.DepthComponent32f, PixelFormat.DepthComponent, PixelType.Float);
-            case ImageFormat.D32FloatS8UInt:
-                return (InternalFormat.Depth32fStencil8, PixelFormat.DepthStencil, PixelType.Float32UnsignedInt248Rev);
-            default:
-                throw new ArgumentOutOfRangeException(nameof(format));
-        }
-    }
-    static BufferUsageARB TranslateUsageHint(BufferType type)
-    {
-        switch (type)
-        {
-            case BufferType.GpuOnly:
-                return BufferUsageARB.StaticDraw;
-            case BufferType.Upload:
-                return BufferUsageARB.DynamicDraw;
-            case BufferType.Readback:
-                return BufferUsageARB.StreamRead;
-            default:
-                throw new ArgumentOutOfRangeException(nameof(type));
-        }
-    }
-    static BufferTargetARB TranslateBufferTarget(BufferUsage usage)
-    {
-        if ((usage & BufferUsage.Index) != 0)
-        {
-            return BufferTargetARB.ElementArrayBuffer;
-        }
-        if ((usage & BufferUsage.Vertex) != 0)
-        {
-            return BufferTargetARB.ArrayBuffer;
-        }
-        if ((usage & BufferUsage.Constant) != 0)
-        {
-            return BufferTargetARB.UniformBuffer;
-        }
-        if ((usage & BufferUsage.Storage) != 0)
-        {
-            return BufferTargetARB.ShaderStorageBuffer;
-        }
-        if ((usage & BufferUsage.Indirect) != 0)
-        {
-            return BufferTargetARB.DrawIndirectBuffer;
-        }
-        if ((usage & BufferUsage.CopySource) != 0)
-        {
-            return BufferTargetARB.CopyReadBuffer;
-        }
-        throw new ArgumentOutOfRangeException(nameof(usage));
-    }
-    static ShaderType TranslateShaderStage(ShaderStage stage)
-    {
-        if ((stage & ShaderStage.Vertex) != 0)
-        {
-            return ShaderType.VertexShader;
-        }
-        if ((stage & ShaderStage.Pixel) != 0)
-        {
-            return ShaderType.FragmentShader;
-        }
-        if ((stage & ShaderStage.Compute) != 0)
-        {
-            return ShaderType.ComputeShader;
-        }
-        throw new ArgumentOutOfRangeException(nameof(stage));
-    }
+            string extension = _gl.GetStringS(StringName.Extensions, i);
 
-    static bool IsIntegerFormat(VertexFormat format)
-    {
-        switch (format)
-        {
-            case VertexFormat.Int1:
-            case VertexFormat.UInt1:
-            case VertexFormat.Byte1:
+            if (string.Equals(extension, name, StringComparison.Ordinal))
+            {
                 return true;
-            default:
-                return false;
+            }
         }
+
+        return false;
     }
-    static int GetComponentCount(VertexFormat format)
+
+    private void UtilResetToBackBufferFormats()
     {
-        switch (format)
-        {
-            case VertexFormat.Float2:
-                return 2;
-            case VertexFormat.Float3:
-                return 3;
-            case VertexFormat.Float4:
-                return 4;
-            default:
-                return 1;
-        }
+        _currentColorFormats = _backBufferColorFormats;
+        _currentDepthStencilFormat = null;
+        _currentSampleCount = 1;
     }
-    static VertexAttribIType GetIntegerType(VertexFormat format)
+
+    private unsafe nint UtilLoadGLFunction(string name)
     {
-        switch (format)
+        nint address = (nint)SDL.GLGetProcAddress(name);
+
+#if WINDOWS
+        if (address == 0)
         {
-            case VertexFormat.Int1:
-                return VertexAttribIType.Int;
-            case VertexFormat.UInt1:
-                return VertexAttribIType.UnsignedInt;
-            case VertexFormat.Byte1:
-                return VertexAttribIType.UnsignedByte;
-            default:
-                throw new ArgumentOutOfRangeException(nameof(format));
+            nint module = UtilWinGetModuleHandleA("opengl32.dll");
+            address = UtilWinGetProcAddress(module, name);
         }
+#endif
+
+        return address;
     }
+
+    #endregion
 }

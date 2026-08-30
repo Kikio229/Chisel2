@@ -1,31 +1,27 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
-namespace Chisel.Framework.Utilities;
+namespace Chisel.Framework;
 
-public sealed class FpsCounter
+public class FpsCounter
 {
-    private readonly Queue<double> frameTimes = new();
-    private double accumulatedTime;
-
     public double AverageFps { get; private set; }
+    private double _accumulatedTime;
+    private readonly Queue<double> _frameTimes = new();
 
     public void Update(double delta)
     {
-        frameTimes.Enqueue(delta);
-        accumulatedTime += delta;
+        _frameTimes.Enqueue(delta);
+        _accumulatedTime += delta;
 
-        while (accumulatedTime > 1.0 && frameTimes.Count > 1)
+        while (_accumulatedTime > 1.0 && _frameTimes.Count > 1)
         {
-            accumulatedTime -= frameTimes.Dequeue();
+            _accumulatedTime -= _frameTimes.Dequeue();
         }
 
-        if (accumulatedTime > 0.0)
+        if (_accumulatedTime > 0.0)
         {
-            AverageFps = frameTimes.Count / accumulatedTime;
+            AverageFps = _frameTimes.Count / _accumulatedTime;
         }
     }
 }

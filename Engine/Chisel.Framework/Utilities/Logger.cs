@@ -17,13 +17,10 @@ public static class Logger
     public static void AppendBasic(string message, bool debugOnly = false)
     {
 #if !DEBUG
-        if (debugOnly)
-        {
-            return;
-        }
+        if (debugOnly) { return; }
 #endif
 
-        AppendLog(null, message, ConsoleColor.White, 2);
+        AppendLog(null, message, ConsoleColor.White);
     }
 
     public static void AppendInfo(object value, bool debugOnly = false)
@@ -34,13 +31,10 @@ public static class Logger
     public static void AppendInfo(string message, bool debugOnly = false)
     {
 #if !DEBUG
-        if (debugOnly)
-        {
-            return;
-        }
+        if (debugOnly) { return; }
 #endif
 
-        AppendLog("Info", message, ConsoleColor.Cyan, 2);
+        AppendLog("Info", message, ConsoleColor.Cyan);
     }
 
     public static void AppendWarn(object value, bool debugOnly = false)
@@ -51,13 +45,10 @@ public static class Logger
     public static void AppendWarn(string message, bool debugOnly = false)
     {
 #if !DEBUG
-        if (debugOnly)
-        {
-            return;
-        }
+        if (debugOnly) { return; }
 #endif
 
-        AppendLog("Warn", message, ConsoleColor.Yellow, 2);
+        AppendLog("Warn", message, ConsoleColor.Yellow);
     }
 
     public static void AppendError(object value, bool debugOnly = false)
@@ -68,17 +59,18 @@ public static class Logger
     public static void AppendError(string message, bool debugOnly = false)
     {
 #if !DEBUG
-        if (debugOnly)
-        {
-            return;
-        }
+        if (debugOnly) { return; }
 #endif
 
-        AppendLog("Error", message, ConsoleColor.Red, 2);
+        AppendLog("Error", message, ConsoleColor.Red);
     }
 
-    public static void AppendLog(string? header, string message, ConsoleColor color, int skipFrames)
+    public static void AppendLog(string? header, string message, ConsoleColor color, int skipFrames = 2, bool debugOnly = false)
     {
+#if !DEBUG
+        if (debugOnly) { return; }
+#endif
+
         OnMessage? msg = Message;
 
         if (msg != null)

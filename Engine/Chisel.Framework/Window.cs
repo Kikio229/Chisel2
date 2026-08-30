@@ -1,7 +1,6 @@
-﻿using Chisel.Framework.Utilities;
-using Hexa.NET.SDL3;
-using System;
+﻿using System;
 using System.Runtime.InteropServices;
+using Hexa.NET.SDL3;
 
 namespace Chisel.Framework;
 

@@ -4,5 +4,10 @@ namespace Chisel.Framework;
 
 public struct ComputeStateDescription
 {
-    public IShader ComputeShader;
+    public IShader? ComputeShader;
+
+    public ComputeStateDescription()
+    {
+        ComputeShader = null;
+    }
 }

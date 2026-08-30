@@ -15,8 +15,8 @@ internal sealed class FrameLanedBuffer : IDisposable
     {
         _device = device;
         _shadow = new byte[size];
-        _buffers = new IBuffer[device.BufferingCount];
-        _dirty = new (int, int)[device.BufferingCount];
+        _buffers = new IBuffer[device.BufferCount];
+        _dirty = new (int, int)[device.BufferCount];
 
         for (int i = 0; i < _buffers.Length; i++)
         {

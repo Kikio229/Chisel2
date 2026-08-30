@@ -6,13 +6,13 @@
     "GeneralPlayground (DX12)": {
       "commandName": "Project",
       "environmentVariables": {
-        "CHISEL_FORCE_BACKEND": "Direct3D12"
+        "CHISEL_FORCE_BACKEND": "Direct3D"
       }
     },
     "GeneralPlayground (OpenGL)": {
       "commandName": "Project",
       "environmentVariables": {
-        "CHISEL_FORCE_BACKEND": "OpenGL46"
+        "CHISEL_FORCE_BACKEND": "OpenGL"
       }
     }
   }

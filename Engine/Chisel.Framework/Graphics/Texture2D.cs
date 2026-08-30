@@ -97,7 +97,7 @@ public class Texture2D : IDisposable
             {
                 Size = size,
                 Type = BufferType.Upload,
-                Usage = BufferUsage.CopySource,
+                Usage = BufferUsage.CopySrc,
             });
             stagingBufferSize = size;
         }

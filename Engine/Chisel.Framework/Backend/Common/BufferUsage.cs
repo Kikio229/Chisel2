@@ -11,5 +11,6 @@ public enum BufferUsage
     Constant = 1 << 2,
     Storage = 1 << 3,
     Indirect = 1 << 4,
-    CopySource = 1 << 5,
+    CopySrc = 1 << 5,
+    CopyDst = 1 << 6,
 }

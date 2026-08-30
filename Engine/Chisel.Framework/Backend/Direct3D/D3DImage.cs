@@ -12,10 +12,10 @@ internal class D3DImage : Disposable, IImage
     public uint Width { get; }
     public uint Height { get; }
     public uint MipLevels { get; }
+    public uint SampleCount { get; }
     public ImageFormat Format { get; }
     public ImageUsage Usage { get; }
 
-    internal uint SampleCount { get; }
     internal Allocation Allocation { get; }
     internal unsafe ID3D12Resource* Resource { get; }
     internal ResourceStates State;
