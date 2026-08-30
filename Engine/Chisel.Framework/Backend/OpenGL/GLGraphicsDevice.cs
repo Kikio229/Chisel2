@@ -45,7 +45,7 @@ public partial class GLGraphicsDevice : Disposable, IGraphicsDevice
 
         FrameIndexInternal = 0;
         SampleCountInternal = 1;
-        BufferCountInternal = 0;
+        BufferCountInternal = 2;
         ColorFormatsInternal = BackBufferColorFormats;
         DepthStencilFormatInternal = ImageFormat.D24UNormS8UInt;
 
