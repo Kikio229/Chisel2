@@ -10,37 +10,49 @@ namespace Chisel.Framework;
 
 public partial class GLGraphicsDevice : Disposable, IGraphicsDevice
 {
-    public uint FrameIndex => 0;
-    public uint SampleCount => _currentSampleCount;
-    public uint BufferCount => 2;
-    public GraphicsBackend Backend => GraphicsBackend.OpenGL;
-    public ImageFormat[] ColorFormats => _currentColorFormats;
-    public ImageFormat? DepthStencilFormat => _currentDepthStencilFormat;
+    public uint FrameIndex => FrameIndexInternal;
+    public uint SampleCount => SampleCountInternal;
+    public uint BufferCount => BufferCountInternal;
+    public ImageFormat[] ColorFormats => ColorFormatsInternal;
+    public ImageFormat? DepthStencilFormat => DepthStencilFormatInternal;
+    public GraphicsBackend Backend => GraphicsBackend.OpenGL; // This will never change obv
 
+    internal uint FrameIndexInternal { get; set; }
+    internal uint SampleCountInternal { get; set; }
+    internal uint BufferCountInternal { get; set; }
+    internal ImageFormat[] ColorFormatsInternal { get; set; }
+    internal ImageFormat? DepthStencilFormatInternal { get; set; }
+    internal static readonly ImageFormat[] BackBufferColorFormats = { ImageFormat.R8G8B8A8UNorm };
 
- 
     private readonly GL _gl;
     private readonly SDLGLContext _glContext;
     private GLGraphicsState _currentState; // To avoid duplicate state changes
 
-    private uint _currentVao, _currentSampleCount;
-    private uint[] _boundTextureBySlot = new uint[16];
-    private uint[] _boundSamplerBySlot = new uint[16];
-    private Dictionary<(uint bufferHandle, VertexLayoutDescription layout), uint> _vaoCache = new();
-    private Dictionary<uint, uint> _vbufferSlots = new Dictionary<uint, uint>();
+    private uint _currentVao;
+    private uint[] _boundTextureBySlot, _boundSamplerBySlot;
+    private Dictionary<(uint bufferHandle, VertexLayoutDescription layout), uint> _vaoCache;
+    private Dictionary<uint, uint> _vbufferSlots; 
     private bool _isDebug;
 
-    private DebugProc _debugCallback;
+    private DebugProc? _debugCallback;
     private Rectangle _currentViewport;
-    private ImageFormat[] _currentColorFormats = _backBufferColorFormats;
-    private ImageFormat? _currentDepthStencilFormat;
-    private static readonly ImageFormat[] _backBufferColorFormats = { ImageFormat.R8G8B8A8UNorm };
-
+    
     public unsafe GLGraphicsDevice(SDLGLContext context, bool debug)
     {
         _glContext = context;
         _gl = GL.GetApi(UtilLoadGLFunction);
         _isDebug = debug;
+
+        FrameIndexInternal = 0;
+        SampleCountInternal = 1;
+        BufferCountInternal = 0;
+        ColorFormatsInternal = BackBufferColorFormats;
+        DepthStencilFormatInternal = ImageFormat.D24UNormS8UInt;
+
+        _boundTextureBySlot = new uint[16];
+        _boundSamplerBySlot = new uint[16];
+        _vaoCache = new Dictionary<(uint bufferHandle, VertexLayoutDescription layout), uint>();
+        _vbufferSlots = new Dictionary<uint, uint>();
 
         string version = _gl.GetStringS(StringName.Version);
 
@@ -78,7 +90,6 @@ public partial class GLGraphicsDevice : Disposable, IGraphicsDevice
 
     public unsafe void EndFrame()
     {
-        // Swap buffers
         SDL.GLSwapWindow(Game.Instance!.Window.Handle);
     }
 
@@ -95,16 +106,16 @@ public partial class GLGraphicsDevice : Disposable, IGraphicsDevice
 
         if (glTarget.ColorInternal!.Length > 0)
         {
-            _currentColorFormats = Array.ConvertAll(glTarget.ColorInternal, c => c.Format);
-            _currentSampleCount = glTarget.DepthStencilInternal!.SampleCount;
+            ColorFormatsInternal = Array.ConvertAll(glTarget.ColorInternal, c => c.Format);
+            SampleCountInternal = glTarget.DepthStencilInternal!.SampleCount;
         }
         else
         {
-            _currentColorFormats = Array.Empty<ImageFormat>();
-            _currentSampleCount = 1;
+            ColorFormatsInternal = Array.Empty<ImageFormat>();
+            SampleCountInternal = 1;
         }
 
-        _currentDepthStencilFormat = glTarget.DepthStencilInternal?.Format;
+        DepthStencilFormatInternal = glTarget.DepthStencilInternal?.Format;
     }
 
     public void EndDrawing()
@@ -703,9 +714,9 @@ public partial class GLGraphicsDevice : Disposable, IGraphicsDevice
 
     private void UtilResetToBackBufferFormats()
     {
-        _currentColorFormats = _backBufferColorFormats;
-        _currentDepthStencilFormat = null;
-        _currentSampleCount = 1;
+        ColorFormatsInternal = BackBufferColorFormats;
+        DepthStencilFormatInternal = null;
+        SampleCountInternal = 1;
     }
 
     private unsafe nint UtilLoadGLFunction(string name)
