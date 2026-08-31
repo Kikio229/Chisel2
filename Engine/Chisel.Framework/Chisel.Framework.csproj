@@ -23,6 +23,7 @@
 		
 		<PackageReference Include="Hexa.NET.SDL3" Version="1.2.17" />
 		<PackageReference Include="Silk.NET.OpenGL" Version="2.23.0" />
+
 		<PackageReference Include="Vortice.Win32.Graphics.Direct3D12" Version="2.5.0" />
 		<PackageReference Include="Vortice.Win32.Graphics.Direct3D.Dxc" Version="2.5.0" />
 		<PackageReference Include="Vortice.Win32.Graphics.D3D12MemoryAllocator" Version="2.5.0" />

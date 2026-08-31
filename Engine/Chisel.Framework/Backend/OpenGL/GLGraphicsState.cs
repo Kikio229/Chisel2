@@ -20,59 +20,61 @@ internal class GLGraphicsState : Disposable, IGraphicsState
 
     private readonly GL _gl;
 
-    public GLGraphicsState(GL gl, GraphicsStateDescription desc, bool defaultState)
+    // This exists solely to allow for dummy handles
+    public GLGraphicsState()
+    {
+        Handle = 0;
+        _gl = new GL(null);
+    }
+
+    public GLGraphicsState(GL gl, GLShader? vtxShader, GLShader? pixShader, ImageFormat[]? colorFormats, ImageFormat? depthStencilFormat,
+        GraphicsTopology topology, GraphicsDepthMode depthMode, GraphicsBlendMode blendMode, GraphicsCullMode cullMode, GraphicsFillMode fillMode,
+        VertexLayoutDescription vtxLayout, bool depthWrite, uint sampleCount)
     {
         _gl = gl;
-        Handle = 0;
 
-        if (!defaultState)
+        Handle = _gl.CreateProgram();
+
+        if (vtxShader != null)
         {
-            Handle = _gl.CreateProgram();
-
-            GLShader vert = (GLShader)desc.VertexShader!;
-            GLShader frag = (GLShader)desc.PixelShader!;
-
-            if (vert != null)
-            {
-                _gl.AttachShader(Handle, vert.Handle);
-            }
-
-            if (frag != null)
-            {
-                _gl.AttachShader(Handle, frag.Handle);
-            }
-
-            _gl.LinkProgram(Handle);
-            _gl.GetProgram(Handle, ProgramPropertyARB.LinkStatus, out int linkStatus);
-
-            if (linkStatus == 0)
-            {
-                string log = _gl.GetProgramInfoLog(Handle);
-                _gl.DeleteProgram(Handle);
-                throw new InvalidOperationException("Failed to link GL program: " + log);
-            }
-
-            // Apparently GL is weird, so we have to do whatever tf this is:
-            _gl.UseProgram(Handle);
-            BindReflectedSlots(Handle, vert!);
-            BindReflectedSlots(Handle, frag!);
-            _gl.UseProgram(0);
+            _gl.AttachShader(Handle, vtxShader.Handle);
         }
 
-        (bool depthEnabled, DepthFunction depthFunc) = GLUtilities.GetNativeDepthMode(desc.DepthMode);
-        (bool blendEnabled, BlendingFactor src, BlendingFactor dst, BlendEquationModeEXT eq) = GLUtilities.GetNativeBlendMode(desc.BlendMode);
-        (bool cullEnabled, TriangleFace cullFace) = GLUtilities.GetNativeCullMode(desc.CullMode);
+        if (pixShader != null)
+        {
+            _gl.AttachShader(Handle, pixShader.Handle);
+        }
 
-        Topology = GLUtilities.GetNativeTopologyMode(desc.Topology);
+        _gl.LinkProgram(Handle);
+        _gl.GetProgram(Handle, ProgramPropertyARB.LinkStatus, out int linkStatus);
+
+        if (linkStatus == 0)
+        {
+            string log = _gl.GetProgramInfoLog(Handle);
+            _gl.DeleteProgram(Handle);
+            throw new InvalidOperationException("Failed to link GL program: " + log);
+        }
+
+        // Apparently GL is weird, so we have to do whatever tf this is:
+        _gl.UseProgram(Handle);
+        BindReflectedSlots(Handle, vtxShader!);
+        BindReflectedSlots(Handle, pixShader!);
+        _gl.UseProgram(0);
+       
+        (bool depthEnabled, DepthFunction depthFunc) = GLUtilities.GetNativeDepthMode(depthMode);
+        (bool blendEnabled, BlendingFactor src, BlendingFactor dst, BlendEquationModeEXT eq) = GLUtilities.GetNativeBlendMode(blendMode);
+        (bool cullEnabled, TriangleFace cullFace) = GLUtilities.GetNativeCullMode(cullMode);
+
+        Topology = GLUtilities.GetNativeTopologyMode(topology);
         DepthFunc = depthFunc;
         BlendSrcFactor = src;
         BlendDstFactor = dst;
         BlendEquation = eq;
         CullFace = cullFace;
-        FillMode = GLUtilities.GetNativeFillMode(desc.FillMode);
+        FillMode = GLUtilities.GetNativeFillMode(fillMode);
 
         DepthTestEnabled = depthEnabled;
-        DepthWriteEnabled = desc.AllowDepthWrite;
+        DepthWriteEnabled = depthWrite;
         BlendEnabled = blendEnabled;
         CullEnabled = cullEnabled;
     }

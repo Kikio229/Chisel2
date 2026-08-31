@@ -35,7 +35,7 @@ public struct Quaternion : IEquatable<Quaternion>, IFormattable
     public static Quaternion Zero => new Quaternion(0f, 0f, 0f, 0f);
     public static Quaternion Identity => new Quaternion(0f, 0f, 0f, 1f);
 
-    private readonly Vector128<float> _value;
+    private Vector128<float> _value;
 
     public Quaternion()
         : this(0f, 0f, 0f, 0f)
@@ -133,7 +133,6 @@ public struct Quaternion : IEquatable<Quaternion>, IFormattable
     public Quaternion Slerp(Quaternion quat, float amount)
     {
         float dot;
-        const float epsilon = 0.000001f;
 
         if (MathUtilities.X86SimdSupported)
         {
@@ -169,7 +168,7 @@ public struct Quaternion : IEquatable<Quaternion>, IFormattable
         float sinTheta = (1.0f - dot * dot).Sqrt();
         float theta = sinTheta.Atan2(dot);
 
-        if ((sinTheta).Abs() < epsilon)
+        if ((sinTheta).Abs() < MathUtilities.EpsilonF)
         {
             return Lerp(quat, amount);
         }

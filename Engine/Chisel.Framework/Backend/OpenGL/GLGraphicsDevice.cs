@@ -77,7 +77,7 @@ public partial class GLGraphicsDevice : Disposable, IGraphicsDevice
         }
 
         SDL.GLSetSwapInterval(Game.Instance!.Window.IsVsyncOn ? 1 : 0);
-        _currentState = new GLGraphicsState(_gl, new GraphicsStateDescription(), true); // Default state
+        _currentState = new GLGraphicsState(); // Default state
         GC.SuppressFinalize(_currentState); // GC was randomly gobbling it up
         Logger.AppendLog("GL", "Successfully initialized OpenGL " + version, ConsoleColor.DarkCyan, 1);
     }
@@ -382,7 +382,7 @@ public partial class GLGraphicsDevice : Disposable, IGraphicsDevice
         }
 
         _gl.ActiveTexture(TextureUnit.Texture0 + (int)slot);
-        _gl.BindTexture(TextureTarget.Texture2D, glImage.Handle);
+        _gl.BindTexture(glImage.Target, glImage.Handle);
         _boundTextureBySlot[slot] = glImage.Handle;
     }
 
@@ -779,7 +779,9 @@ public partial class GLGraphicsDevice : Disposable, IGraphicsDevice
             throw new ArgumentException("Provided rasterizer settings are unknown or invalid!");
         }
 
-        GLGraphicsState state = new GLGraphicsState(_gl, graphicsDesc, false);
+        GLGraphicsState state = new GLGraphicsState(_gl, (GLShader?)graphicsDesc.VertexShader, (GLShader?)graphicsDesc.PixelShader,
+            graphicsDesc.ColorFormats, graphicsDesc.DepthStencilFormat, graphicsDesc.Topology, graphicsDesc.DepthMode, graphicsDesc.BlendMode, graphicsDesc.CullMode,
+            graphicsDesc.FillMode, graphicsDesc.VertexLayout, graphicsDesc.AllowDepthWrite, graphicsDesc.SampleCount == 0 ? 1u : graphicsDesc.SampleCount);
         return (IGraphicsState)state;
     }
 
