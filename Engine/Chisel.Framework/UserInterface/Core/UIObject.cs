@@ -16,9 +16,10 @@ public abstract class UIObject(UILayoutOptions options)
     public abstract bool AllowNavigatingTo { get; }
     public abstract bool AbsorbInputs { get; }
 
-    public UILayoutOptions LayoutOptions { get; set; } = options;
+    public bool IsHighlighted { get; private set; }
+    public bool IsSelected { get; private set; }
 
-    protected bool IsHighlighted { get; set; }
+    public UILayoutOptions LayoutOptions { get; set; } = options;
 
     public Vector2 Right
     {
@@ -129,15 +130,53 @@ public abstract class UIObject(UILayoutOptions options)
 
     public void Update(float dt)
     {
+        if(IsMouseOverRect(new Rectangle(Position - HalfSize, Position + HalfSize)))
+        {
+            if (!IsHighlighted) OnHighlighted();
+            IsHighlighted = true;
+        }
+        else
+        {
+            if (IsHighlighted) OnUnhighlighted();
+            IsHighlighted = false;
+        }
+
+        if(IsHighlighted && InputManager.IsInputHeld(Input.MouseLeft))
+        {
+            if (!IsSelected)
+            {
+                OnPrimaryClicked();
+            }
+            IsSelected = true;
+        }
+        else if (IsHighlighted && InputManager.IsInputHeld(Input.MouseRight))
+        {
+            if (!IsSelected)
+            {
+                OnSecondaryClicked();
+            }
+            IsSelected = true;
+        }
+        else
+        {
+            IsSelected = false;
+        }
+
         OnUpdate(dt);
 
-        foreach (var c in Children) c.Update(dt);
+        for(int i = Children.Count-1; i >= 0; i--)
+        {
+            Children[i].Update(dt);
+        }
     }
     public void Render(float dt, SpriteBatch batch, Texture2D atlasTexture)
     {
         OnRender(dt, batch, atlasTexture);
 
-        foreach (var c in Children) c.Render(dt,batch,atlasTexture);
+        for (int i = Children.Count - 1; i >= 0; i--)
+        {
+            Children[i].Render(dt, batch, atlasTexture);
+        }
     }
 
     public abstract void OnUpdate(float dt);
@@ -152,5 +191,16 @@ public abstract class UIObject(UILayoutOptions options)
         var mouse = InputManager.MousePosition;
 
         return rect.ContainsVector(mouse);
+    }
+
+    public void AddChild(UIObject child)
+    {
+        child.Parent = this;
+        Children.Add(child);
+    }
+    public void RemoveChild(UIObject child)
+    {
+        child.Parent = null;
+        Children.Remove(child);
     }
 }

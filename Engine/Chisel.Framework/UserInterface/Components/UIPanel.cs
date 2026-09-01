@@ -31,14 +31,18 @@ public class UIPanel : UIObject
     }
     public override void OnRender(float dt, SpriteBatch batch, Texture2D atlasTexture)
     {
-        int cornerW = PanelRect.Width / 3;
-        int cornerH = PanelRect.Height / 3;
+        RenderPanel(dt,batch,atlasTexture, Tint, PanelRect);
+    }
+    public void RenderPanel(float dt, SpriteBatch batch, Texture2D atlasTexture, Color tint, Rectangle rect)
+    {
+        int cornerW = rect.Width / 3;
+        int cornerH = rect.Height / 3;
 
-        int srcMidW = PanelRect.Width - cornerW * 2;
-        int srcMidH = PanelRect.Height - cornerH * 2;
+        int srcMidW = rect.Width - cornerW * 2;
+        int srcMidH = rect.Height - cornerH * 2;
 
-        int[] srcX = { PanelRect.X, PanelRect.X + cornerW, PanelRect.X + PanelRect.Width - cornerW };
-        int[] srcY = { PanelRect.Y, PanelRect.Y + cornerH, PanelRect.Y + PanelRect.Height - cornerH };
+        int[] srcX = { rect.X, rect.X + cornerW, rect.X + rect.Width - cornerW };
+        int[] srcY = { rect.Y, rect.Y + cornerH, rect.Y + rect.Height - cornerH };
         int[] srcW = { cornerW, srcMidW, cornerW };
         int[] srcH = { cornerH, srcMidH, cornerH };
 
@@ -57,7 +61,7 @@ public class UIPanel : UIObject
             int ypos = (int)(Position.Y - HalfSize.Y);
             for (int y = 0; y < 3; y++)
             {
-                batch.Draw(atlasTexture, new(xpos, ypos), new(dstW[x], dstH[y]), Tint,
+                batch.Draw(atlasTexture, new(xpos, ypos), new(dstW[x], dstH[y]), tint,
                     new(srcX[x], srcY[y], srcW[x], srcH[y]));
                 ypos += dstH[y];
             }

@@ -1,5 +1,4 @@
-﻿using Chisel.Framework.UserInterface.Components;
-using System;
+﻿using System;
 
 namespace Chisel.Framework.UI;
 public class UIWindow : UIPanel
@@ -15,21 +14,22 @@ public class UIWindow : UIPanel
 
         ResizeContent();
 
-        Children.Add(InnerPanel);
-        InnerPanel.Parent = this;
+        AddChild(InnerPanel);
 
         Tint = new(140,140,140);
 
         var btn = new UIButton(options)
         {
-            HalfSizeOffset = new(16, 8),
-            CenterOffset = new(-12, 7),
+            HalfSizeOffset = new(12, 10),
+            CenterOffset = new(-12, 4),
             Anchor = UIAnchor.Top | UIAnchor.Right,
-            Tint = Color.LightSalmon
+            Tint = new Color(255, 100, 100),
+            Style = ButtonStyle.Default
         };
 
-        Children.Add(btn);
-        btn.Parent = this;
+        btn.OnClicked += () => { Parent.RemoveChild(this); };
+
+        AddChild(btn);
     }
 
     public override Rectangle PanelRect => new(0,0,96,96);

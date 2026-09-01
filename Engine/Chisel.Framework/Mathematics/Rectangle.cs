@@ -58,6 +58,14 @@ public struct Rectangle : IEquatable<Rectangle>, IFormattable
         Height = height;
     }
 
+    public Rectangle(Vector2 min, Vector2 max)
+    {
+        X = (int)min.X;
+        Y = (int)min.Y;
+        Width = (int)(max.X - min.X);
+        Height = (int)(max.Y - min.Y);
+    }
+
     public Rectangle Intersect(Rectangle rect)
     {
         if (Intersects(rect))
@@ -146,6 +154,15 @@ public struct Rectangle : IEquatable<Rectangle>, IFormattable
         }
 
         return false;
+    }
+
+    public static Rectangle operator +(Rectangle left, Rectangle right)
+    {
+        return new Rectangle(left.X + right.X, left.Y + right.Y, left.Width + right.Width, left.Height + right.Height);
+    }
+    public static Rectangle operator -(Rectangle left, Rectangle right)
+    {
+        return new Rectangle(left.X - right.X, left.Y - right.Y, left.Width - right.Width, left.Height - right.Height);
     }
 
     public static bool operator ==(Rectangle left, Rectangle right)
