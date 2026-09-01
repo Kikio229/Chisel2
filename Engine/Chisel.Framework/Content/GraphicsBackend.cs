@@ -3,6 +3,7 @@
 public enum GraphicsBackend
 {
     Auto = 0,
-    Direct3D, // Direct3D12
+    Direct3D, // TODO: Remove
+    Vulkan,
     OpenGL,
 }

@@ -1,0 +1,18 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<OutputType>Exe</OutputType>
+		<TargetFramework>net9.0</TargetFramework>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Nullable>enable</Nullable>
+		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+	</PropertyGroup>
+
+	<!-- TODO: Add content pipeline one it's set up for Vulkan -->
+
+	<ItemGroup>
+		<ProjectReference Include="..\..\Engine\Chisel.Framework\Chisel.Framework.csproj" />
+		<ProjectReference Include="..\..\Engine\Chisel.Resource.Builder\Chisel.Resource.Builder.csproj" />
+	</ItemGroup>
+
+</Project>

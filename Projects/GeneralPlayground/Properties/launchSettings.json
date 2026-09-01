@@ -3,16 +3,16 @@
     "GeneralPlayground (Auto)": {
       "commandName": "Project"
     },
-    "GeneralPlayground (DX12)": {
-      "commandName": "Project",
-      "environmentVariables": {
-        "CHISEL_FORCE_BACKEND": "Direct3D"
-      }
-    },
     "GeneralPlayground (OpenGL)": {
       "commandName": "Project",
       "environmentVariables": {
         "CHISEL_FORCE_BACKEND": "OpenGL"
+      }
+    },
+    "GeneralPlayground (Vulkan)": {
+      "commandName": "Project",
+      "environmentVariables": {
+        "CHISEL_FORCE_BACKEND": "Vulkan"
       }
     }
   }

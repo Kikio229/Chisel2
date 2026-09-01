@@ -9,5 +9,6 @@
     <Project Path="Projects/GeneralPlayground/GeneralPlayground.csproj" Id="f833433a-f0c3-4375-93ba-48a8519f5a52" />
     <Project Path="Projects/GLTest/GLTest.csproj" />
     <Project Path="Projects/UITests/UITests.csproj" />
+    <Project Path="Projects/VKTest/VKTest.csproj" Id="061ccc89-4d21-4e0f-8561-f2bcf74c015d" />
   </Folder>
 </Solution>

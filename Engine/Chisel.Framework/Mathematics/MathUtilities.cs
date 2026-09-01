@@ -143,6 +143,9 @@ public static class MathUtilities
     public static int Clamp(this int value, int min, int max) => Math.Clamp(value, min, max);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static uint Clamp(this uint value, uint min, uint max) => Math.Clamp(value, min, max);
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static float Clamp(this float value, float min, float max) => Math.Clamp(value, min, max);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -164,6 +167,9 @@ public static class MathUtilities
     public static int Min(this int value, int other) => Math.Min(value, other);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static uint Min(this uint value, uint other) => Math.Min(value, other);
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static float Min(this float value, float other) => Math.Min(value, other);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -171,6 +177,9 @@ public static class MathUtilities
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static int Max(this int value, int other) => Math.Max(value, other);
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static uint Max(this uint value, uint other) => Math.Max(value, other);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static float Max(this float value, float other) => Math.Max(other, value);

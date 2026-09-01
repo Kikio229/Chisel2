@@ -62,11 +62,12 @@ public class Game
 
         switch (Window.Backend)
         {
+            case GraphicsBackend.Vulkan:
+                GraphicsDevice = new VKGraphicsDevice(_isDebug);
+                break;
+
             case GraphicsBackend.OpenGL:
                 GraphicsDevice = new GLGraphicsDevice(Window.GLContext, _isDebug);
-                break;
-            case GraphicsBackend.Direct3D:
-                GraphicsDevice = new D3DGraphicsDevice(_isDebug);
                 break;
         }
 

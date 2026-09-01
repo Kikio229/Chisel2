@@ -45,7 +45,7 @@ public class Window : Disposable
     public CursorMode CursorMode { get; private set; }
     public bool IsFocused { get; private set; } = true;
 
-    public GraphicsBackend Backend { get; set; } = GraphicsBackend.Direct3D;
+    public GraphicsBackend Backend { get; set; } = GraphicsBackend.OpenGL;
 
     // GL is weird and has to know it's allowed here before anything
     public unsafe SDLGLContext GLContext { get; private set; }
@@ -102,10 +102,7 @@ public class Window : Disposable
 
             throw new ArgumentException($"Unknown CHISEL_FORCE_BACKEND value: '{forced}'");
         }
-#if WINDOWS
-        return GraphicsBackend.Direct3D;
-#endif
-        // Good fallback.
+
         return GraphicsBackend.OpenGL;
     }
 
@@ -275,12 +272,6 @@ public class Window : Disposable
             {
                 nextFrame = (double)SDL.GetPerformanceFrequency() / frequency;
             }
-        }
-
-        // This is kinda hacky and we should prob just have a GD.OnShutdown.
-        if (Game.Instance!.GraphicsDevice is D3DGraphicsDevice d3d)
-        {
-            d3d.WaitForGPU();
         }
 
         Shutdown?.Invoke();

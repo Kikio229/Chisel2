@@ -34,7 +34,7 @@ public class ConstantBuffer : IDisposable
         GraphicsDevice = device;
         data = new byte[sizeInBytes];
 
-        useArena = device.Backend == GraphicsBackend.Direct3D;
+        //useArena = device.Backend == GraphicsBackend.Direct3D;
 
         if (useArena)
         {
