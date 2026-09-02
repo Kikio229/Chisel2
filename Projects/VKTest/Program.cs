@@ -25,9 +25,8 @@ public class TestGame : Game
     {
         base.OnDrawFrame(delta);
 
-        GraphicsDevice.BeginFrame();
-        GraphicsDevice.Clear(Color.Aqua, 1f, 0, GraphicsClearFlags.Color | GraphicsClearFlags.Depth);
-        GraphicsDevice.EndFrame();
+        // Thank you elgen for not telling me BeginFrame and EndFrame were implicit
+        GraphicsDevice.Clear(Color.Aqua, 1f, 0, GraphicsClearFlags.Color); 
     }
 
     protected override void OnShutdown()

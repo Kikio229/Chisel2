@@ -38,29 +38,25 @@ public class VKGraphicsDevice : Disposable, IGraphicsDevice
     private PhysicalDevice _physDevice;
     private Device _logiDevice;
 
-    private uint _graphicsQueueFamily, _presentQueueFamily;
-    private Queue _graphicsQueue, _presentQueue;
-    private Semaphore[] _imageAvailableSemas;   // len = frames in flight
-    private Semaphore[] _renderFinishedSemas;   // len = swapchain images
-    private Fence[] _inFlightFences;            // len = frames in flight
-
-    private CommandBuffer[] _cmdBuffers;
-
     private SurfaceKHR _surface;
-    private KhrSurface _surfaceExt;
-
     private SwapchainKHR _swapChain;
+    private KhrSurface _surfaceExt;
     private KhrSwapchain _swapChainExt;
+
+    private uint _graphicsFamily, _presentFamily;
+    private Queue _graphicsQueue, _presentQueue;
+    private Semaphore[] _availableSemas, _finishedSemas;
+    private Fence[] _fences;
+
+    private CommandPool _cmdPool;
+    private CommandBuffer[] _cmdBuffers;
 
     private Image[] _swapImages;
     private ImageView[] _swapImageViews;
+    private ImageLayout[] _swapImageLayouts; // This is mostly here just to shut up the validator 
     private Format _swapFormat;
     private Extent2D _swapExtent;
-
-    private CommandPool _cmdPool;
-
-    private uint _currentFrame;
-    private uint _currentImage;
+    private uint _currentFrame, _currentImage;
 
     // Vulkan Debug
     private ExtDebugUtils _dbgUtilities;
@@ -75,7 +71,7 @@ public class VKGraphicsDevice : Disposable, IGraphicsDevice
 
         FrameIndexInternal = 0;
         SampleCountInternal = 1;
-        BufferCountInternal = 2;
+        BufferCountInternal = 3; // Triple buffering is apparently recommended for Vulkan?
         ColorFormatsInternal = BackBufferColorFormats;
         DepthStencilFormatInternal = ImageFormat.D24UNormS8UInt;
 
@@ -86,6 +82,7 @@ public class VKGraphicsDevice : Disposable, IGraphicsDevice
         InitLogicalDevice();
         InitSwapChain();
         InitImageViews();
+        InitImageLayouts();
         InitCommandPool();
         InitCommandBuffer();
         InitSemaphores();
@@ -95,28 +92,27 @@ public class VKGraphicsDevice : Disposable, IGraphicsDevice
 
     public unsafe void BeginFrame()
     {
-        Fence fence = _inFlightFences[_currentFrame];
-        Result waitResult = _vk.WaitForFences(_logiDevice, 1, &fence, true, 10000000000); // 10 second wait
+        Fence fence = _fences[_currentFrame];
+        Result waitResult = _vk.WaitForFences(_logiDevice, 1, &fence, true, (ulong)1e+9);
 
         if (waitResult != Result.Success)
         {
             throw new InvalidOperationException($"WaitForFences failed! VkResult: {waitResult}");
         }
 
-        Result acquireResult = _swapChainExt.AcquireNextImage(_logiDevice, _swapChain, ulong.MaxValue, _imageAvailableSemas[_currentFrame], default, ref _currentImage);
+        _vk.ResetFences(_logiDevice, 1, &fence);
+        Result acquireResult = _swapChainExt.AcquireNextImage(_logiDevice, _swapChain, (ulong)1e+9, _availableSemas[_currentFrame], default, ref _currentImage);
 
         if (acquireResult == Result.ErrorOutOfDateKhr)
         {
             UtilRecreateSwapChain();
             return;
         }
-
-        if (acquireResult != Result.Success)
+        else if (acquireResult != Result.Success)
         {
             throw new InvalidOperationException($"Failed to acquire VK swapchain image! VkResult: {acquireResult}");
         }
 
-        _vk.ResetFences(_logiDevice, 1, &fence);
         CommandBuffer cmd = _cmdBuffers[_currentFrame];
         _vk.ResetCommandBuffer(cmd, CommandBufferResetFlags.None);
 
@@ -133,13 +129,15 @@ public class VKGraphicsDevice : Disposable, IGraphicsDevice
             throw new InvalidOperationException($"Failed to begin VK command buffer! VkResult: {beginResult}");
         }
 
-        UtilTransitionImageLayout(cmd, _swapImages[_currentImage], ImageLayout.Undefined, ImageLayout.TransferDstOptimal);
+        UtilTransitionImageLayout(cmd, ImageLayout.TransferDstOptimal);
+        _swapImageLayouts[_currentImage] = ImageLayout.TransferDstOptimal;
     }
 
     public unsafe void EndFrame()
     {
         CommandBuffer cmd = _cmdBuffers[_currentFrame];
-        UtilTransitionImageLayout(cmd, _swapImages[_currentImage], ImageLayout.TransferDstOptimal, ImageLayout.PresentSrcKhr);
+        UtilTransitionImageLayout(cmd, ImageLayout.PresentSrcKhr);
+        _swapImageLayouts[_currentImage] = ImageLayout.PresentSrcKhr;
 
         Result endResult = _vk.EndCommandBuffer(cmd);
 
@@ -148,8 +146,8 @@ public class VKGraphicsDevice : Disposable, IGraphicsDevice
             throw new InvalidOperationException($"Failed to end VK command buffer! VkResult: {endResult}");
         }
 
-        Semaphore waitSema = _imageAvailableSemas[_currentFrame];
-        Semaphore signalSema = _renderFinishedSemas[_currentImage];
+        Semaphore waitSema = _availableSemas[_currentFrame];
+        Semaphore signalSema = _finishedSemas[_currentImage];
         PipelineStageFlags waitStage = PipelineStageFlags.TransferBit;
 
         SubmitInfo submitInfo = new SubmitInfo
@@ -164,7 +162,7 @@ public class VKGraphicsDevice : Disposable, IGraphicsDevice
             PSignalSemaphores = &signalSema,
         };
 
-        Result submitResult = _vk.QueueSubmit(_graphicsQueue, 1, &submitInfo, _inFlightFences[_currentFrame]);
+        Result submitResult = _vk.QueueSubmit(_graphicsQueue, 1, &submitInfo, _fences[_currentFrame]);
 
         if (submitResult != Result.Success)
         {
@@ -524,19 +522,19 @@ public class VKGraphicsDevice : Disposable, IGraphicsDevice
         _surfaceExt.DestroySurface(_instance, _surface, null);
         _vk.DestroyCommandPool(_logiDevice, _cmdPool, null);
 
-        for (int i = 0; i < _imageAvailableSemas.Length; i++)
+        for (int i = 0; i < _availableSemas.Length; i++)
         {
-            _vk.DestroySemaphore(_logiDevice, _imageAvailableSemas[i], null);
+            _vk.DestroySemaphore(_logiDevice, _availableSemas[i], null);
         }
 
-        for (int i = 0; i < _renderFinishedSemas.Length; i++)
+        for (int i = 0; i < _finishedSemas.Length; i++)
         {
-            _vk.DestroySemaphore(_logiDevice, _renderFinishedSemas[i], null);
+            _vk.DestroySemaphore(_logiDevice, _finishedSemas[i], null);
         }
 
-        for (int i = 0; i < _inFlightFences.Length; i++)
+        for (int i = 0; i < _fences.Length; i++)
         {
-            _vk.DestroyFence(_logiDevice, _inFlightFences[i], null);
+            _vk.DestroyFence(_logiDevice, _fences[i], null);
         }
     }
 
@@ -693,35 +691,57 @@ public class VKGraphicsDevice : Disposable, IGraphicsDevice
         UtilDestroySwapChain();
         InitSwapChain();
         InitImageViews();
+        InitImageLayouts();
     }
 
-    private unsafe void UtilTransitionImageLayout(CommandBuffer cmdBuffer, Image image, ImageLayout oldLayout, ImageLayout newLayout)
+    private unsafe void UtilTransitionImageLayout(CommandBuffer cmdBuffer, ImageLayout newLayout)
     {
-        ImageMemoryBarrier barrier = new ImageMemoryBarrier
+        Image image = _swapImages[_currentImage];
+        ImageLayout oldLayout = _swapImageLayouts[_currentImage];
+
+        ImageMemoryBarrier[] barriers = new ImageMemoryBarrier[1]
         {
-            SType = StructureType.ImageMemoryBarrier,
-            OldLayout = oldLayout,
-            NewLayout = newLayout,
-            SrcQueueFamilyIndex = Vk.QueueFamilyIgnored,
-            DstQueueFamilyIndex = Vk.QueueFamilyIgnored,
-            Image = image,
-            SubresourceRange = new ImageSubresourceRange(ImageAspectFlags.ColorBit, 0, 1, 0, 1),
+            new ImageMemoryBarrier
+            {
+                SType = StructureType.ImageMemoryBarrier,
+                OldLayout = oldLayout,
+                NewLayout = newLayout,
+                SrcQueueFamilyIndex = Vk.QueueFamilyIgnored,
+                DstQueueFamilyIndex = Vk.QueueFamilyIgnored,
+                Image = image,
+                SubresourceRange = new ImageSubresourceRange(ImageAspectFlags.ColorBit, 0, 1, 0, 1),
+            }
         };
 
         PipelineStageFlags srcStage, dstStage;
 
         if (oldLayout == ImageLayout.Undefined && newLayout == ImageLayout.TransferDstOptimal)
         {
-            barrier.SrcAccessMask = AccessFlags.None;
-            barrier.DstAccessMask = AccessFlags.TransferWriteBit;
+            barriers[0].SrcAccessMask = AccessFlags.None;
+            barriers[0].DstAccessMask = AccessFlags.TransferWriteBit;
             srcStage = PipelineStageFlags.TopOfPipeBit;
             dstStage = PipelineStageFlags.TransferBit;
         }
         else if (oldLayout == ImageLayout.TransferDstOptimal && newLayout == ImageLayout.PresentSrcKhr)
         {
-            barrier.SrcAccessMask = AccessFlags.TransferWriteBit;
-            barrier.DstAccessMask = AccessFlags.None;
+            barriers[0].SrcAccessMask = AccessFlags.TransferWriteBit;
+            barriers[0].DstAccessMask = AccessFlags.None;
             srcStage = PipelineStageFlags.TransferBit;
+            dstStage = PipelineStageFlags.BottomOfPipeBit;
+        }
+        else if (oldLayout == ImageLayout.PresentSrcKhr && newLayout == ImageLayout.TransferDstOptimal)
+        {
+            barriers[0].SrcAccessMask = AccessFlags.None;
+            barriers[0].DstAccessMask = AccessFlags.TransferWriteBit;
+            srcStage = PipelineStageFlags.BottomOfPipeBit;
+            dstStage = PipelineStageFlags.TransferBit;
+        }
+        else if (oldLayout == ImageLayout.PresentSrcKhr && newLayout == ImageLayout.PresentSrcKhr)
+        {
+            // No-op transition... Still need to set up barrier fields
+            barriers[0].SrcAccessMask = AccessFlags.None;
+            barriers[0].DstAccessMask = AccessFlags.None;
+            srcStage = PipelineStageFlags.BottomOfPipeBit;
             dstStage = PipelineStageFlags.BottomOfPipeBit;
         }
         else
@@ -729,10 +749,22 @@ public class VKGraphicsDevice : Disposable, IGraphicsDevice
             throw new NotImplementedException($"Unhandled Vulkan layout transition! ({oldLayout} -> {newLayout})");
         }
 
-        _vk.CmdPipelineBarrier(cmdBuffer, srcStage, dstStage, DependencyFlags.None, 0, null, 0, null, 1, in barrier);
+        fixed (ImageMemoryBarrier* bptr = barriers)
+        {
+            _vk.CmdPipelineBarrier(cmdBuffer, srcStage, dstStage, DependencyFlags.None, 0, null, 0, null, (uint)barriers.Length, bptr);
+        }
+
+        for (int i = 0; i < _swapImages.Length; i++)
+        {
+            if (_swapImages[i].Handle == image.Handle)
+            {
+                _swapImageLayouts[i] = newLayout;
+                break;
+            }
+        }
     }
 
-#endregion
+    #endregion
 
     // RIP the funny comment elgen put here in the old D3D12 renderer, in partial reference to how bad D3D setup is in C#.
     // Although Vulkan's init really isn't all that much more legible... at least we're not doing a bunch of weird COM stuff this time
@@ -909,15 +941,15 @@ public class VKGraphicsDevice : Disposable, IGraphicsDevice
         }
 
         _physDevice = best;
-        _graphicsQueueFamily = bestGraphicsFamily;
-        _presentQueueFamily = bestPresentFamily;
+        _graphicsFamily = bestGraphicsFamily;
+        _presentFamily = bestPresentFamily;
     }
 
     private unsafe void InitLogicalDevice()
     {
         int queue = 0;
         float priority = 1.0f;
-        HashSet<uint> families = new HashSet<uint> { _graphicsQueueFamily, _presentQueueFamily };
+        HashSet<uint> families = new HashSet<uint> { _graphicsFamily, _presentFamily };
         DeviceQueueCreateInfo[] queueInfos = new DeviceQueueCreateInfo[families.Count];
 
         foreach (uint f in families)
@@ -952,14 +984,14 @@ public class VKGraphicsDevice : Disposable, IGraphicsDevice
 
             if (result != Result.Success)
             {
-                throw new InvalidOperationException($"Failed to create VK logical device: VkResult: {result}");
+                throw new InvalidOperationException($"Failed to create VK logical device! VkResult: {result}");
             }
 
             SilkMarshal.Free((nint)eptr);
         }
 
-        _vk.GetDeviceQueue(_logiDevice, _graphicsQueueFamily, 0, out _graphicsQueue);
-        _vk.GetDeviceQueue(_logiDevice, _presentQueueFamily, 0, out _presentQueue);
+        _vk.GetDeviceQueue(_logiDevice, _graphicsFamily, 0, out _graphicsQueue);
+        _vk.GetDeviceQueue(_logiDevice, _presentFamily, 0, out _presentQueue);
 
         if (!_vk.TryGetDeviceExtension(_instance, _logiDevice, out _swapChainExt))
         {
@@ -1035,9 +1067,9 @@ public class VKGraphicsDevice : Disposable, IGraphicsDevice
             OldSwapchain = default,
         };
 
-        uint[] queueFamilies = { _graphicsQueueFamily, _presentQueueFamily };
+        uint[] queueFamilies = { _graphicsFamily, _presentFamily };
 
-        if (_graphicsQueueFamily != _presentQueueFamily)
+        if (_graphicsFamily != _presentFamily)
         {
             fixed (uint* qptr = queueFamilies)
             {
@@ -1055,7 +1087,7 @@ public class VKGraphicsDevice : Disposable, IGraphicsDevice
 
         if (result != Result.Success)
         {
-            throw new InvalidOperationException($"Failed to create VK swapchain: VkResult: {result}");
+            throw new InvalidOperationException($"Failed to create VK swapchain! VkResult: {result}");
         }
 
         _swapFormat = format.Format;
@@ -1095,8 +1127,18 @@ public class VKGraphicsDevice : Disposable, IGraphicsDevice
 
             if (result != Result.Success)
             {
-                throw new InvalidOperationException($"Failed to create VK image view: VkResult: {result}");
+                throw new InvalidOperationException($"Failed to create VK image view! VkResult: {result}");
             }
+        }
+    }
+
+    private void InitImageLayouts()
+    {
+        _swapImageLayouts = new ImageLayout[_swapImages.Length];
+
+        for (int i = 0; i < _swapImages.Length; i++)
+        {
+            _swapImageLayouts[i] = ImageLayout.Undefined;
         }
     }
 
@@ -1106,14 +1148,14 @@ public class VKGraphicsDevice : Disposable, IGraphicsDevice
         {
             SType = StructureType.CommandPoolCreateInfo,
             Flags = CommandPoolCreateFlags.ResetCommandBufferBit,
-            QueueFamilyIndex = _graphicsQueueFamily,
+            QueueFamilyIndex = _graphicsFamily,
         };
 
         Result result = _vk.CreateCommandPool(_logiDevice, &poolInfo, null, out _cmdPool);
 
         if (result != Result.Success)
         {
-            throw new InvalidOperationException($"Failed to create VK command pool: VkResult: {result}");
+            throw new InvalidOperationException($"Failed to create VK command pool! VkResult: {result}");
         }
     }
 
@@ -1135,15 +1177,15 @@ public class VKGraphicsDevice : Disposable, IGraphicsDevice
 
             if (result != Result.Success)
             {
-                throw new InvalidOperationException($"Failed to create VK command buffer: VkResult: {result}");
+                throw new InvalidOperationException($"Failed to create VK command buffer! VkResult: {result}");
             }
         }
     }
 
     private unsafe void InitSemaphores()
     {
-        _imageAvailableSemas = new Semaphore[BufferCountInternal];
-        _renderFinishedSemas = new Semaphore[_swapImages.Length];
+        _availableSemas = new Semaphore[BufferCountInternal];
+        _finishedSemas = new Semaphore[_swapImages.Length];
 
         SemaphoreCreateInfo semaInfo = new SemaphoreCreateInfo
         {
@@ -1153,27 +1195,27 @@ public class VKGraphicsDevice : Disposable, IGraphicsDevice
 
         for (int i = 0; i < BufferCountInternal; i++)
         {
-            Result result = _vk.CreateSemaphore(_logiDevice, &semaInfo, null, out _imageAvailableSemas[i]);
+            Result result = _vk.CreateSemaphore(_logiDevice, &semaInfo, null, out _availableSemas[i]);
 
             if (result != Result.Success)
             {
-                throw new InvalidOperationException($"Failed to create VK pending semaphore: VkResult: {result}");
+                throw new InvalidOperationException($"Failed to create VK available semaphore! VkResult: {result}");
             }
         }
         for (int i = 0; i < _swapImages.Length; i++)
         {
-            Result result = _vk.CreateSemaphore(_logiDevice, &semaInfo, null, out _renderFinishedSemas[i]);
+            Result result = _vk.CreateSemaphore(_logiDevice, &semaInfo, null, out _finishedSemas[i]);
 
             if (result != Result.Success)
             {
-                throw new InvalidOperationException($"Failed to create VK finished semaphore: VkResult: {result}");
+                throw new InvalidOperationException($"Failed to create VK finished semaphore! VkResult: {result}");
             }
         }
     }
 
     private unsafe void InitFences()
     {
-        _inFlightFences = new Fence[BufferCountInternal];
+        _fences = new Fence[BufferCountInternal];
 
         FenceCreateInfo fenceInfo = new FenceCreateInfo
         {
@@ -1183,11 +1225,11 @@ public class VKGraphicsDevice : Disposable, IGraphicsDevice
 
         for (int i = 0; i < BufferCountInternal; i++)
         {
-            Result result = _vk.CreateFence(_logiDevice, &fenceInfo, null, out _inFlightFences[i]);
+            Result result = _vk.CreateFence(_logiDevice, &fenceInfo, null, out _fences[i]);
 
             if (result != Result.Success)
             {
-                throw new InvalidOperationException($"Failed to create VK fence: VkResult: {result}");
+                throw new InvalidOperationException($"Failed to create VK fence! VkResult: {result}");
             }
         }
     }
