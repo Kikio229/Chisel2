@@ -59,8 +59,8 @@ public class VKGraphicsDevice : Disposable, IGraphicsDevice
     private uint _currentFrame, _currentImage;
 
     // Vulkan Debug
-    private ExtDebugUtils _dbgUtilities;
-    private DebugUtilsMessengerEXT _dbgMessenger;
+    private ExtDebugUtils? _dbgUtilities;
+    private DebugUtilsMessengerEXT? _dbgMessenger;
     private DebugUtilsMessengerCallbackFunctionEXT? _dbgCallback;
     private static readonly string[] _validation = { "VK_LAYER_KHRONOS_validation" };
 
@@ -101,7 +101,12 @@ public class VKGraphicsDevice : Disposable, IGraphicsDevice
         }
 
         _vk.ResetFences(_logiDevice, 1, &fence);
-        Result acquireResult = _swapChainExt.AcquireNextImage(_logiDevice, _swapChain, (ulong)1e+9, _availableSemas[_currentFrame], default, ref _currentImage);
+        Result acquireResult;
+
+        fixed (uint* iptr = &_currentImage)
+        {
+            acquireResult = _swapChainExt.AcquireNextImage(_logiDevice, _swapChain, (ulong)1e+9, _availableSemas[_currentFrame], default, iptr);
+        }
 
         if (acquireResult == Result.ErrorOutOfDateKhr)
         {
@@ -182,7 +187,7 @@ public class VKGraphicsDevice : Disposable, IGraphicsDevice
             PImageIndices = &imageIndex,
         };
 
-        Result presentResult = _swapChainExt.QueuePresent(_presentQueue, in presentInfo);
+        Result presentResult = _swapChainExt.QueuePresent(_presentQueue, &presentInfo);
 
         if (presentResult == Result.ErrorOutOfDateKhr || presentResult == Result.SuboptimalKhr)
         {
@@ -513,7 +518,7 @@ public class VKGraphicsDevice : Disposable, IGraphicsDevice
 
         if (_isDebug)
         {
-            _dbgUtilities.DestroyDebugUtilsMessenger(_instance, _dbgMessenger, null);
+            _dbgUtilities?.DestroyDebugUtilsMessenger(_instance, _dbgMessenger!.Value, null);
         }
 
         UtilDestroySwapChain();
@@ -852,12 +857,14 @@ public class VKGraphicsDevice : Disposable, IGraphicsDevice
             PfnUserCallback = new PfnDebugUtilsMessengerCallbackEXT(_dbgCallback),
         };
 
-        Result result = _dbgUtilities!.CreateDebugUtilsMessenger(_instance, &dbgInfo, null, out _dbgMessenger);
+        Result result = _dbgUtilities!.CreateDebugUtilsMessenger(_instance, &dbgInfo, null, out DebugUtilsMessengerEXT messenger);
 
         if (result != Result.Success)
         {
             throw new InvalidOperationException($"Failed to create VK debug messenger! VkResult: {result}");
         }
+
+        _dbgMessenger = messenger;
     }
 
     private unsafe void InitSurface()
@@ -1021,15 +1028,23 @@ public class VKGraphicsDevice : Disposable, IGraphicsDevice
             _surfaceExt.GetPhysicalDeviceSurfacePresentModes(_physDevice, _surface, &presentCount, pptr);
         }
 
-        SurfaceFormatKHR format = formats.FirstOrDefault(
-            f => f.Format == Silk.NET.Vulkan.Format.R8G8B8A8Unorm && f.ColorSpace == ColorSpaceKHR.SpaceSrgbNonlinearKhr,
-            formats[0]);
+        PresentModeKHR present;
 
-        bool vsync = Game.Instance!.Window.IsVsyncOn;
-        PresentModeKHR present = (vsync)
-            ? PresentModeKHR.FifoKhr // Should match SDL.GLSetSwapInterval(1)... I think
-            : (presentModes.Contains(PresentModeKHR.MailboxKhr) ? PresentModeKHR.MailboxKhr : PresentModeKHR.ImmediateKhr);
-
+        if (Game.Instance!.Window.IsVsyncOn)
+        {
+            present = PresentModeKHR.FifoKhr; // Should match SDL.GLSetSwapInterval(1)
+        }
+        else
+        { 
+            if (presentModes.Contains(PresentModeKHR.MailboxKhr))
+            {
+                present = PresentModeKHR.MailboxKhr;
+            }
+            else
+            {
+                present = PresentModeKHR.ImmediateKhr;
+            }
+        }
 
         Extent2D extent;
 
@@ -1048,6 +1063,10 @@ public class VKGraphicsDevice : Disposable, IGraphicsDevice
         {
             imageCount = capabilities.MaxImageCount;
         }
+
+        SurfaceFormatKHR format = formats.FirstOrDefault(
+            f => f.Format == Format.R8G8B8A8Unorm && f.ColorSpace == ColorSpaceKHR.SpaceSrgbNonlinearKhr,
+            formats[0]);
 
         SwapchainCreateInfoKHR swapInfo = new SwapchainCreateInfoKHR
         {
@@ -1243,29 +1262,25 @@ public class VKGraphicsDevice : Disposable, IGraphicsDevice
 
         UtilLogMessage($"Successfully initialized Vulkan!");
 
-        // These specifically pull whatever the vendor set as their vulkan driver identifier.
-        // Nvidia usually just uses the actual GeForce driver version, but AMD is kinda weird
-        // and has the Adrenalin driver version and the actual version of their Vulkan driver seperated.
-        // Example: Adrenalin 26.8.1 may have a Vulkan version of 2.0.395
+        // Based on this:
+        // https://github.com/SaschaWillems/vulkan.gpuinfo.org/blob/1e6ca6e3c0763daabd6a101b860ab4354a07f5d3/functions.php#L294
         if (properties.VendorID == 0x10DE && OperatingSystem.IsWindows()) // Nvidia
         {
             uint major = (driver >> 22) & 0x3FF;
             uint minor = (driver >> 14) & 0x0FF;
-            uint subMinor = (driver >> 6) & 0x0FF;
-            uint patch = driver & 0x03F;
-            UtilLogMessage($"   > GPU: {gpu} (driver: {major}.{minor}.{subMinor}.{patch})");
+            uint subminor = (driver >> 6) & 0x0FF;
+            uint patch = driver & 0x003F;
+            UtilLogMessage($"   > GPU: {gpu} (driver: {major}.{minor}.{subminor}.{patch})");
         }
-        else if (properties.VendorID == 0x1002 && OperatingSystem.IsWindows()) // AMD
+        else if (properties.VendorID == 0x8086 && OperatingSystem.IsWindows()) // Intel
         {
-            uint major = (driver >> 22) & 0x3FF;
-            uint minor = 0; // They always set this to 0 for whatever reason
-            uint build = driver & 0x3FFFFF;
-            UtilLogMessage($"   > GPU: {gpu} (driver: {major}.{minor}.{build})");
-
+            uint major = (driver >> 14);
+            uint minor = driver & 0x3FFF;
+            UtilLogMessage($"   > GPU: {gpu} (driver: {major}.{minor})");
         }
-        else // Mesa (and Intel apparently?) use standard versioning instead
+        else // Mesa uses a standard convention I think
         {
-            uint major = (driver >> 22) & 0x7F;
+            uint major = (driver >> 22);
             uint minor = (driver >> 12) & 0x3FF;
             uint patch = driver & 0xFFF;
             UtilLogMessage($"   > GPU: {gpu} (driver: {major}.{minor}.{patch})");

@@ -14,6 +14,8 @@ public class TestGame : Game
     protected override unsafe void OnStartup()
     {
         base.OnStartup();
+
+        Window.SetVsyncMode(false);
     }
 
     protected override void OnFrameUpdate(double delta)
