@@ -1255,67 +1255,74 @@ public class VKGraphicsDevice : Disposable, IGraphicsDevice
 
     private unsafe void QueryGpuInfo()
     {
-        _vk.GetPhysicalDeviceProperties(_physDevice, out PhysicalDeviceProperties properties);
+        //_vk.GetPhysicalDeviceProperties(_physDevice, out PhysicalDeviceProperties properties);
 
-        uint driver = properties.DriverVersion;
+        PhysicalDeviceDriverProperties driverProps = new PhysicalDeviceDriverProperties()
+        {
+            SType = StructureType.PhysicalDeviceDriverProperties,
+        };
 
-        uint apiMajor = (_vkVersion >> 22);
-        uint apiMinor = (_vkVersion >> 12) & 0x3FF;
-        uint apiMajorMax = (properties.ApiVersion >> 22);
-        uint apiMinorMax = (properties.ApiVersion >> 12) & 0x3FF;
+        PhysicalDeviceProperties2 deviceProps = new()
+        {
+            SType = StructureType.PhysicalDeviceProperties2,
+            PNext = &driverProps
+        };
 
-        uint major = (driver >> 22);
-        uint minor = (driver >> 12) & 0x3FF;
-        uint subminor = 0; // Only used for Nvidia but may as well place it here
-        uint patch = driver & 0xFFF;
+        _vk.GetPhysicalDeviceProperties2(_physDevice, &deviceProps);
 
         UtilLogMessage($"Vulkan successfully initialized!");
         UtilLogMessage($"Vulkan device information: ");
 
-        if (OperatingSystem.IsWindows())
+        uint apiMajor = (_vkVersion >> 22);
+        uint apiMinor = (_vkVersion >> 12) & 0x3FF;
+        uint apiMajorMax = (deviceProps.Properties.ApiVersion >> 22);
+        uint apiMinorMax = (deviceProps.Properties.ApiVersion >> 12) & 0x3FF;
+
+        string driver = Marshal.PtrToStringAnsi((nint)driverProps.DriverName)!;
+        uint driverVersion = deviceProps.Properties.DriverVersion;
+        string version = string.Empty;
+
+        switch (driverProps.DriverID)
         {
-            // Based on this:
-            // https://github.com/SaschaWillems/vulkan.gpuinfo.org/blob/1e6ca6e3c0763daabd6a101b860ab4354a07f5d3/functions.php#L294
-            switch (properties.VendorID)
-            {
-                case 0x10DE: // Nvidia
-                    major = (driver >> 22) & 0x3FF;
-                    minor = (driver >> 14) & 0x0FF;
-                    subminor = (driver >> 6) & 0x0FF;
-                    patch = driver & 0x003F;
-                    UtilLogMessage($"\t> Vendor: {"NVIDIA Corporation"}");
-                    UtilLogMessage($"\t> Version: {apiMajor}.{apiMinor} (NVIDIA {major}.{minor}.{subminor}.{patch} [{apiMajorMax}.{apiMinorMax}])");
-                    break;
+            case DriverId.NvidiaProprietary:
+                version = $"{(driverVersion >> 22) & 0x3FF}.{(driverVersion >> 14) & 0x0FF}.{(driverVersion >> 6) & 0x0FF}.{(driverVersion) & 0x003F}";
+                break;
 
-                case 0x1002: // ATI/AMD
-                    major = (driver >> 22) & 0x3FF;
-                    minor = (driver >> 12) & 0x3FF;
-                    patch = driver & 0xFFF;
-                    UtilLogMessage($"\t> Vendor: {"ATI Technologies (AMD)"}");
-                    UtilLogMessage($"\t> Version: {apiMajor}.{apiMinor} (AMD {major}.{minor}.{patch} [{apiMajorMax}.{apiMinorMax}])");
-                    break;
+            case DriverId.AmdProprietary:
+                version = $"{(driverVersion >> 22) & 0x3FF}.{(driverVersion >> 12) & 0x3FF}.{(driverVersion) & 0xFFF}";
+                break;
 
-                case 0x8086: // Intel
-                    major = (driver >> 14);
-                    minor = driver & 0x3FFF;
-                    UtilLogMessage($"\t> Vendor: {"Intel Corporation"}");
-                    UtilLogMessage($"\t> Version: {apiMajor}.{apiMinor} (INTEL {major}.{minor} [{apiMajorMax}.{apiMinorMax}])");
-                    break;
+            case DriverId.IntelProprietaryWindows:
+                version = $"{(driverVersion >> 14) & 0x0FF}.{(driverVersion) & 0x3FFF}";
+                break;
 
-                default:
-                    UtilLogMessage($"\t> Vendor: {"Unknown"}");
-                    UtilLogMessage($"\t> Version: {apiMajor}.{apiMinor} (UNKN {major}.{minor}.{patch} [{apiMajorMax}.{apiMinorMax}])");
-                    break;
+            // Desktop Mesa
+            case DriverId.MesaNvk: // Nvidia GeForce
+            case DriverId.MesaRadv: // AMD/ATI Radeon
+            case DriverId.IntelOpenSourceMesa: // Not sure if this is Intel ARC or UHD
+                version = $"{(driverVersion >> 22) & 0x07F}.{(driverVersion >> 14) & 0x0FF}.{(driverVersion) & 0x3FF}";
+                break;
 
-            }
-        }
-        else
-        {
-            UtilLogMessage($"\t> Vendor: {"Mesa"}");
-            UtilLogMessage($"\t> Version: {apiMajor}.{apiMinor} (UNKVK {major}.{minor}.{patch} [VK-{apiMajorMax}.{apiMinorMax}])");
+            // Mobile Mesa
+            case DriverId.MesaPanvk: // ARM Mali
+            case DriverId.MesaTurnip: // Qualcomm Adreno
+            case DriverId.MesaV3DV: // Broadcom VideoCore
+            case DriverId.MesaVenus: // Used for virtual machines
+                version = $"{(driverVersion >> 22) & 0x07F}.{(driverVersion >> 14) & 0x0FF}.{(driverVersion) & 0x3FF}";
+                break;
+
+            // Why do these exist?
+            case DriverId.MesaLlvmpipe: // Software implementation
+            case DriverId.MesaDozen: // Vulkan-To-Direct3D12 driver
+            case DriverId.MesaHoneykrisp: // Vulkan-To-Metal driver
+            case DriverId.MesaKosmickrisp: // Vulkan-To-Metal driver
+                version = $"{(driverVersion >> 22) & 0x07F}.{(driverVersion >> 14) & 0x0FF}.{(driverVersion) & 0x3FF}";
+                break;
         }
 
-        UtilLogMessage($"\t> Renderer: {Marshal.PtrToStringAnsi((nint)properties.DeviceName)!}");
+        UtilLogMessage($"\t> Vendor: {driver} (driver {version})");
+        UtilLogMessage($"\t> Version: {apiMajor}.{apiMinor} ({apiMajorMax}.{apiMinorMax} features available)");
+        UtilLogMessage($"\t> Renderer: {Marshal.PtrToStringAnsi((nint)deviceProps.Properties.DeviceName)!}");
 
         PhysicalDeviceMemoryBudgetPropertiesEXT budgetInfo = new PhysicalDeviceMemoryBudgetPropertiesEXT()
         {
