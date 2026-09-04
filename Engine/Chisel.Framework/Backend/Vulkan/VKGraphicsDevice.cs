@@ -931,7 +931,7 @@ public class VKGraphicsDevice : Disposable, IGraphicsDevice
 
             _vk.GetPhysicalDeviceProperties(d, out PhysicalDeviceProperties properties);
 
-            int score = properties.DeviceType == PhysicalDeviceType.DiscreteGpu ? 1000 : 1;
+            int score = (properties.DeviceType == PhysicalDeviceType.DiscreteGpu) ? 1000 : 1;
 
             if (score > bestScore)
             {
@@ -1257,36 +1257,65 @@ public class VKGraphicsDevice : Disposable, IGraphicsDevice
     {
         _vk.GetPhysicalDeviceProperties(_physDevice, out PhysicalDeviceProperties properties);
 
-        string gpu = Marshal.PtrToStringAnsi((nint)properties.DeviceName)!;
         uint driver = properties.DriverVersion;
 
-        UtilLogMessage($"Successfully initialized Vulkan!");
+        uint apiMajor = (_vkVersion >> 22);
+        uint apiMinor = (_vkVersion >> 12) & 0x3FF;
+        uint apiMajorMax = (properties.ApiVersion >> 22);
+        uint apiMinorMax = (properties.ApiVersion >> 12) & 0x3FF;
 
-        // Based on this:
-        // https://github.com/SaschaWillems/vulkan.gpuinfo.org/blob/1e6ca6e3c0763daabd6a101b860ab4354a07f5d3/functions.php#L294
-        if (properties.VendorID == 0x10DE && OperatingSystem.IsWindows()) // Nvidia
+        uint major = (driver >> 22);
+        uint minor = (driver >> 12) & 0x3FF;
+        uint subminor = 0; // Only used for Nvidia but may as well place it here
+        uint patch = driver & 0xFFF;
+
+        UtilLogMessage($"Vulkan successfully initialized!");
+        UtilLogMessage($"Vulkan device information: ");
+
+        if (OperatingSystem.IsWindows())
         {
-            uint major = (driver >> 22) & 0x3FF;
-            uint minor = (driver >> 14) & 0x0FF;
-            uint subminor = (driver >> 6) & 0x0FF;
-            uint patch = driver & 0x003F;
-            UtilLogMessage($"   > GPU: {gpu} (driver: {major}.{minor}.{subminor}.{patch})");
+            // Based on this:
+            // https://github.com/SaschaWillems/vulkan.gpuinfo.org/blob/1e6ca6e3c0763daabd6a101b860ab4354a07f5d3/functions.php#L294
+            switch (properties.VendorID)
+            {
+                case 0x10DE: // Nvidia
+                    major = (driver >> 22) & 0x3FF;
+                    minor = (driver >> 14) & 0x0FF;
+                    subminor = (driver >> 6) & 0x0FF;
+                    patch = driver & 0x003F;
+                    UtilLogMessage($"\t> Vendor: {"NVIDIA Corporation"}");
+                    UtilLogMessage($"\t> Version: {apiMajor}.{apiMinor} (NVIDIA {major}.{minor}.{subminor}.{patch} [{apiMajorMax}.{apiMinorMax}])");
+                    break;
+
+                case 0x1002: // ATI/AMD
+                    major = (driver >> 22) & 0x3FF;
+                    minor = (driver >> 12) & 0x3FF;
+                    patch = driver & 0xFFF;
+                    UtilLogMessage($"\t> Vendor: {"ATI Technologies (AMD)"}");
+                    UtilLogMessage($"\t> Version: {apiMajor}.{apiMinor} (AMD {major}.{minor}.{patch} [{apiMajorMax}.{apiMinorMax}])");
+                    break;
+
+                case 0x8086: // Intel
+                    major = (driver >> 14);
+                    minor = driver & 0x3FFF;
+                    UtilLogMessage($"\t> Vendor: {"Intel Corporation"}");
+                    UtilLogMessage($"\t> Version: {apiMajor}.{apiMinor} (INTEL {major}.{minor} [{apiMajorMax}.{apiMinorMax}])");
+                    break;
+
+                default:
+                    UtilLogMessage($"\t> Vendor: {"Unknown"}");
+                    UtilLogMessage($"\t> Version: {apiMajor}.{apiMinor} (UNKN {major}.{minor}.{patch} [{apiMajorMax}.{apiMinorMax}])");
+                    break;
+
+            }
         }
-        else if (properties.VendorID == 0x8086 && OperatingSystem.IsWindows()) // Intel
+        else
         {
-            uint major = (driver >> 14);
-            uint minor = driver & 0x3FFF;
-            UtilLogMessage($"   > GPU: {gpu} (driver: {major}.{minor})");
-        }
-        else // Mesa uses a standard convention I think
-        {
-            uint major = (driver >> 22);
-            uint minor = (driver >> 12) & 0x3FF;
-            uint patch = driver & 0xFFF;
-            UtilLogMessage($"   > GPU: {gpu} (driver: {major}.{minor}.{patch})");
+            UtilLogMessage($"\t> Vendor: {"Mesa"}");
+            UtilLogMessage($"\t> Version: {apiMajor}.{apiMinor} (UNKVK {major}.{minor}.{patch} [VK-{apiMajorMax}.{apiMinorMax}])");
         }
 
-        // Getting the VRAM stats
+        UtilLogMessage($"\t> Renderer: {Marshal.PtrToStringAnsi((nint)properties.DeviceName)!}");
 
         PhysicalDeviceMemoryBudgetPropertiesEXT budgetInfo = new PhysicalDeviceMemoryBudgetPropertiesEXT()
         {
@@ -1304,27 +1333,20 @@ public class VKGraphicsDevice : Disposable, IGraphicsDevice
         ulong totalVram = 0;
         ulong usableVram = 0;
 
-        for (uint i = 0; i < memoryInfo.MemoryProperties.MemoryHeapCount; ++i)
+        for (int i = 0; i < memoryInfo.MemoryProperties.MemoryHeapCount; i++)
         {
-            MemoryHeapFlags heapFlags = memoryInfo.MemoryProperties.MemoryHeaps[(int)i].Flags;
+            MemoryHeapFlags heapFlags = memoryInfo.MemoryProperties.MemoryHeaps[i].Flags;
 
             if ((heapFlags & MemoryHeapFlags.DeviceLocalBit) != 0)
             {
-                totalVram += memoryInfo.MemoryProperties.MemoryHeaps[(int)i].Size;
-                usableVram += budgetInfo.HeapBudget[(int)i];
+                totalVram += memoryInfo.MemoryProperties.MemoryHeaps[i].Size;
+                usableVram += budgetInfo.HeapBudget[i];
             }
         }
 
-        UtilLogMessage($"   > VRAM: {(totalVram * 1e-6):0.00} MB ({(usableVram * 1e-6):0.00} MB available)");
-
-        // Getting the Vulkan version/feature level
-
-        uint apiMajor = (_vkVersion >> 22);
-        uint apiMinor = (_vkVersion >> 12) & 0x3FF;
-        uint apiMajorMax = (properties.ApiVersion >> 22);
-        uint apiMinorMax = (properties.ApiVersion >> 12) & 0x3FF;
-        UtilLogMessage($"   > FL: {apiMajor}.{apiMinor} (Vulkan {apiMajorMax}.{apiMinorMax} available)");
+        const double byteToMb = 1024 * 1024;
+        UtilLogMessage($"\t> Memory: {(totalVram / byteToMb):0.00} MB ({(usableVram / byteToMb):0.00} MB available)");
     }
 
-#endregion
+    #endregion
 }
