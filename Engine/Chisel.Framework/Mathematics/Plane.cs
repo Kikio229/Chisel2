@@ -78,9 +78,9 @@ public struct Plane : IEquatable<Plane>, IFormattable
         return new Plane(Distance, Normal.TransformByQuaternion(quat));
     }
 
-    public Plane TransformByMatrix(Matrix4 matrix)
+    public Plane TransformByMatrix(Matrix matrix)
     {
-        Matrix4 transMat = matrix.Invert().Transpose();
+        Matrix transMat = matrix.Invert().Transpose();
         Vector4 vector = new Vector4(Normal.X, Normal.Y, Normal.Z, Distance);
         Vector4 transVec = vector.TransformByMatrix(transMat);
         return new Plane(transVec);

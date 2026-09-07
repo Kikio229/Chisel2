@@ -35,8 +35,8 @@ public class TestGame : Game
 
     SpriteBatch spriteBatch;
 
-    Matrix4 projection;
-    Matrix4 view;
+    Matrix projection;
+    Matrix view;
     Vector3 forward;
     double elapsed;
 
@@ -104,7 +104,7 @@ public class TestGame : Game
     void UpdateProjection()
     {
         float aspect = Window.Resolution.W / (float)Window.Resolution.H;
-        projection = Matrix4.FromPerspectiveFov(
+        projection = Matrix.FromPerspectiveFov(
             70f * MathUtilities.Deg2RadF, aspect, 0.1f, 100f);
     }
 
@@ -149,7 +149,7 @@ public class TestGame : Game
         if (InputManager.IsInputHeld(Input.KeyA)) cameraPosition -= right * move;
         if (InputManager.IsInputHeld(Input.KeyD)) cameraPosition += right * move;
 
-        view = Matrix4.FromLookAt(cameraPosition, cameraPosition + forward, Vector3.UnitY);
+        view = Matrix.FromLookAt(cameraPosition, cameraPosition + forward, Vector3.UnitY);
     }
 
     protected override void OnDrawFrame(double delta)
@@ -190,8 +190,8 @@ public class TestGame : Game
 
         foreach (var obj in sceneObjects)
         {
-            Matrix4 world = obj.GetWorld(elapsed);
-            Matrix4 worldInverseTranspose = world.Invert().Transpose();
+            Matrix world = obj.GetWorld(elapsed);
+            Matrix worldInverseTranspose = world.Invert().Transpose();
 
             modelShader.Parameters["World"]?.SetValue(world);
             modelShader.Parameters["WorldInverseTranspose"]?.SetValue(worldInverseTranspose);
@@ -207,7 +207,7 @@ public class TestGame : Game
 
         screenTexture.End();
 
-        spriteBatch.Begin(Matrix4.FromOrthographic(0, Window.Resolution.W, Window.Resolution.H, 0, 0, 1));
+        spriteBatch.Begin(Matrix.FromOrthographic(0, Window.Resolution.W, Window.Resolution.H, 0, 0, 1));
         spriteBatch.Draw(screenTexture, Vector2.Zero, new(Window.Resolution.W, Window.Resolution.H), Color.White);
         spriteBatch.End();
 

@@ -31,7 +31,7 @@ public class UIManager
     }
     public void FrameRender(float delta, SpriteBatch batch, Texture2D atlasTexture)
     {
-        batch.Begin(Matrix4.FromOrthographic(rectangle.X, rectangle.X + rectangle.Width,
+        batch.Begin(Matrix.FromOrthographic(rectangle.X, rectangle.X + rectangle.Width,
                                              rectangle.Y + rectangle.Height, rectangle.Y, -10, 10));
 
         root.Render(delta, batch, atlasTexture);

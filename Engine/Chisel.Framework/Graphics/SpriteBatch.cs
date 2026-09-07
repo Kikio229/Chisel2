@@ -102,7 +102,7 @@ public class SpriteBatch : IDisposable
 
         indexBuffer.SetData(indices);
     }
-    public void Begin(Matrix4 viewProjection)
+    public void Begin(Matrix viewProjection)
     {
         foreach (VertexBuffer<SpriteVertex> old in pendingVertexBufferDisposal)
         {

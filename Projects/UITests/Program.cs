@@ -41,8 +41,8 @@ public class TestGame : Game
 
     SpriteBatch spriteBatch;
 
-    Matrix4 projection;
-    Matrix4 view;
+    Matrix projection;
+    Matrix view;
     Vector3 forward;
     double elapsed;
 
@@ -102,7 +102,7 @@ public class TestGame : Game
     void UpdateProjection()
     {
         float aspect = Window.Resolution.W / (float)Window.Resolution.H;
-        projection = Matrix4.FromPerspectiveFov(
+        projection = Matrix.FromPerspectiveFov(
             float.DegreesToRadians(70f), aspect, 0.1f, 100f);
     }
     void BuildCube()
@@ -225,7 +225,7 @@ public class TestGame : Game
         if (InputManager.IsInputHeld(Input.KeyA)) cameraPosition -= right * move;
         if (InputManager.IsInputHeld(Input.KeyD)) cameraPosition += right * move;
 
-        view = Matrix4.FromLookAt(cameraPosition, cameraPosition + forward, Vector3.UnitY);
+        view = Matrix.FromLookAt(cameraPosition, cameraPosition + forward, Vector3.UnitY);
 
         uiManager.FrameUpdate((float)delta);
     }
@@ -245,7 +245,7 @@ public class TestGame : Game
         cubeShader.Parameters["Time"]?.SetValue((float)elapsed);
         cubeShader.Parameters["ScreenSize"]?.SetValue(new Vector2(Window.Resolution.W, Window.Resolution.H));
 
-        Matrix4 world = Matrix4.FromRotationY((float)elapsed * 0.5f);
+        Matrix world = Matrix.FromRotationY((float)elapsed * 0.5f);
         cubeShader.Parameters["World"]?.SetValue(world);
 
         // One warm point light orbiting the cube.
@@ -268,7 +268,7 @@ public class TestGame : Game
 
         screenTexture.End();
 
-        spriteBatch.Begin(Matrix4.FromOrthographic(0, Window.Resolution.W, Window.Resolution.H, 0, 0, 1));
+        spriteBatch.Begin(Matrix.FromOrthographic(0, Window.Resolution.W, Window.Resolution.H, 0, 0, 1));
 
         spriteBatch.Draw(screenTexture, Vector2.Zero, new(Window.Resolution.W, Window.Resolution.H), Color.White);
 

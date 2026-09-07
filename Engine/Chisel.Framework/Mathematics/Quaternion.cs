@@ -2,7 +2,6 @@
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.Intrinsics;
-using System.Runtime.Intrinsics.X86;
 
 namespace Chisel.Framework;
 
@@ -61,10 +60,9 @@ public struct Quaternion : IEquatable<Quaternion>, IFormattable
 
     public float Length()
     {
-        if (MathUtilities.X86SimdSupported)
+        if (Vector128.IsHardwareAccelerated)
         {
-            Vector128<float> len = Sse.Sqrt(Sse41.DotProduct(_value, _value, 0xFF));
-            return Vector128.ToScalar(len);
+            return Vector128.Dot(_value, _value).Sqrt();
         }
 
         return ((X * X) + (Y * Y) + (Z * Z) + (W * W)).Sqrt();
@@ -72,10 +70,9 @@ public struct Quaternion : IEquatable<Quaternion>, IFormattable
 
     public float LengthSquared()
     {
-        if (MathUtilities.X86SimdSupported)
+        if (Vector128.IsHardwareAccelerated)
         {
-            Vector128<float> len = Sse41.DotProduct(_value, _value, 0xFF);
-            return Vector128.ToScalar(len);
+            return Vector128.Dot(_value, _value);
         }
 
         return (X * X) + (Y * Y) + (Z * Z) + (W * W);
@@ -83,10 +80,9 @@ public struct Quaternion : IEquatable<Quaternion>, IFormattable
 
     public float DotProduct(Quaternion quat)
     {
-        if (MathUtilities.X86SimdSupported)
+        if (Vector128.IsHardwareAccelerated)
         {
-            Vector128<float> dot = Sse41.DotProduct(_value, quat._value, 0xFF);
-            return Vector128.ToScalar(dot);
+            return Vector128.Dot(_value, quat._value);
         }
 
         return (X * quat.X) + (Y * quat.Y) + (Z * quat.Z) + (W * quat.W);
@@ -94,19 +90,10 @@ public struct Quaternion : IEquatable<Quaternion>, IFormattable
 
     public Quaternion Normalize()
     {
-        if (MathUtilities.X86SimdSupported)
+        if (Vector128.IsHardwareAccelerated)
         {
-            Vector128<float> dot, ilen, half, threehalfs, ilenSqr;
-            dot = Sse41.DotProduct(_value, _value, 0xFF);
-            ilen = Sse.ReciprocalSqrt(dot);
-
-            // Newton-Raphson refinement
-            half = Vector128.Create(0.5f);
-            threehalfs = Vector128.Create(1.5f);
-            ilenSqr = Sse.Multiply(ilen, ilen);
-            ilen = Sse.Multiply(ilen, Sse.Subtract(threehalfs, Sse.Multiply(Sse.Multiply(dot, ilenSqr), half)));
-
-            return new Quaternion(Sse.Multiply(_value, ilen));
+            float dot = Vector128.Dot(_value, _value);
+            return (dot > 0.0f) ? new Quaternion(Vector128.Divide(_value, Vector128.Create(dot.Sqrt()))) : Quaternion.Zero;
         }
 
         float len = Length();
@@ -115,12 +102,12 @@ public struct Quaternion : IEquatable<Quaternion>, IFormattable
 
     public Quaternion Lerp(Quaternion quat, float amount)
     {
-        if (MathUtilities.X86SimdSupported)
+        if (Vector128.IsHardwareAccelerated)
         {
             Vector128<float> tvec, diff;
             tvec = Vector128.Create(amount);
-            diff = Sse.Subtract(quat._value, _value);
-            return new Quaternion(Sse.Add(_value, Sse.Multiply(tvec, diff))).Normalize();
+            diff = Vector128.Subtract(quat._value, _value);
+            return new Quaternion(Vector128.Add(_value, Vector128.Multiply(tvec, diff)));
         }
 
         return new Quaternion(
@@ -134,9 +121,9 @@ public struct Quaternion : IEquatable<Quaternion>, IFormattable
     {
         float dot;
 
-        if (MathUtilities.X86SimdSupported)
+        if (Vector128.IsHardwareAccelerated)
         {
-            Vector128<float> prod = Sse.Multiply(_value, quat._value);
+            Vector128<float> prod = Vector128.Multiply(_value, quat._value);
             dot = prod.GetElement(0) + prod.GetElement(1) + prod.GetElement(2) + prod.GetElement(3);
 
             if (dot < 0)
@@ -176,12 +163,12 @@ public struct Quaternion : IEquatable<Quaternion>, IFormattable
         float ratioA = ((1.0f - amount) * theta).Sin() / sinTheta;
         float ratioB = (amount * theta).Sin() / sinTheta;
 
-        if (MathUtilities.X86SimdSupported)
+        if (Vector128.IsHardwareAccelerated)
         {
             Vector128<float> ratioAVec, ratioBVec;
             ratioAVec = Vector128.Create(ratioA);
             ratioBVec = Vector128.Create(ratioB);
-            return new Quaternion(Sse.Add(Sse.Multiply(_value, ratioAVec), Sse.Multiply(quat._value, ratioBVec)));
+            return new Quaternion(Vector128.Add(Vector128.Multiply(_value, ratioAVec), Vector128.Multiply(quat._value, ratioBVec)));
         }
         else
         {
@@ -207,7 +194,7 @@ public struct Quaternion : IEquatable<Quaternion>, IFormattable
         return new Quaternion(axis.X * sin, axis.Y * sin, axis.Z * sin, cos);
     }
 
-    public static Quaternion FromRotationMatrix(Matrix4 matrix)
+    public static Quaternion FromRotationMatrix(Matrix matrix)
     {
         float sqrt, half;
         Quaternion result = Quaternion.Zero;
@@ -315,10 +302,9 @@ public struct Quaternion : IEquatable<Quaternion>, IFormattable
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public readonly bool Equals(Quaternion other)
     {
-        if (MathUtilities.X86SimdSupported)
+        if (Vector128.IsHardwareAccelerated)
         {
-            Vector128<float> equal = Sse.CompareEqual(_value, other._value);
-            return Sse.MoveMask(equal) == 0xF;
+            return Vector128.EqualsAll(_value, other._value);
         }
 
         return (X == other.X) && (Y == other.Y) && (Z == other.Z) && (W == other.W);
@@ -338,9 +324,9 @@ public struct Quaternion : IEquatable<Quaternion>, IFormattable
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Quaternion Add(Quaternion left, Quaternion right)
     {
-        if (MathUtilities.X86SimdSupported)
+        if (Vector128.IsHardwareAccelerated)
         {
-            return new Quaternion(Sse.Add(left._value, right._value));
+            return new Quaternion(Vector128.Add(left._value, right._value));
         }
 
         return new Quaternion(left.X + right.X, left.Y + right.Y, left.Z + right.Z, left.W + right.W);
@@ -351,30 +337,34 @@ public struct Quaternion : IEquatable<Quaternion>, IFormattable
     {
         // Quaternion multiplication is real funky...
         // It's even funkier when simd is involed, so just trust that I somehow figured it out
-        if (MathUtilities.X86SimdSupported)
+        if (Vector128.IsHardwareAccelerated)
         {
             Vector128<float> lq, rq, lw, rw;
 
             lq = left._value;
             rq = right._value;
-            lw = Sse.Shuffle(lq, lq, 0xFF);
-            rw = Sse.Shuffle(rq, rq, 0xFF);
+            lw = Vector128.Shuffle(lq, Vector128.Create(3));
+            rw = Vector128.Shuffle(rq, Vector128.Create(3));
 
             Vector128<float> quat, cross, prod, dot;
 
-            quat = Sse.Add(Sse.Multiply(lq, rw), Sse.Multiply(lw, rq));
-            cross = Sse.Subtract(
-                Sse.Multiply(Sse.Shuffle(lq, lq, 0xC9), Sse.Shuffle(rq, rq, 0xD2)),
-                Sse.Multiply(Sse.Shuffle(lq, lq, 0xD2), Sse.Shuffle(rq, rq, 0xC9)));
+            quat = Vector128.Add(Vector128.Multiply(lq, rw), Vector128.Multiply(lw, rq));
+            cross = Vector128.Subtract(
+                Vector128.Multiply(Vector128.Shuffle(lq, Vector128.Create(1, 2, 0, 3)), Vector128.Shuffle(rq, Vector128.Create(2, 0, 1, 3))),
+                Vector128.Multiply(Vector128.Shuffle(lq, Vector128.Create(2, 0, 1, 3)), Vector128.Shuffle(rq, Vector128.Create(1, 2, 0, 3))));
 
-            quat = Sse.Add(quat, cross);
-            prod = Sse.Multiply(lq, rq);
+            quat = Vector128.Add(quat, cross);
+            prod = Vector128.Multiply(lq, rq);
 
-            dot = Sse.Add(prod, Sse.Shuffle(prod, prod, 0x4E));
-            dot = Sse.Add(dot, Sse.Shuffle(prod, prod, 0x55));
-            dot = Sse.Shuffle(dot, dot, 0x00);
+            dot = Vector128.Add(prod, Vector128.Shuffle(prod, Vector128.Create(2, 3, 0, 1)));
+            dot = Vector128.Add(dot, Vector128.Shuffle(prod, Vector128.Create(1)));
+            dot = Vector128.Shuffle(dot, Vector128.Create(0));
 
-            quat = Sse41.Blend(quat, Sse.Subtract(Sse.Multiply(lw, rw), dot), 0x08);
+            // I have make an int vector and then cast it to a float one
+            // because floating-point errors are the bane of my existance
+            Vector128<float> mask = Vector128.Create(0, 0, 0, -1).AsSingle();
+            Vector128<float> scalar = Vector128.Subtract(Vector128.Multiply(lw, rw), dot);
+            quat = Vector128.ConditionalSelect(mask, scalar, quat);
 
             return new Quaternion(quat);
         }

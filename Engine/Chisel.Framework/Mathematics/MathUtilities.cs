@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Runtime.CompilerServices;
-using System.Runtime.Intrinsics.X86;
 
 namespace Chisel.Framework;
 
@@ -28,11 +27,6 @@ public static class MathUtilities
     public const float EulerF = 2.71828175f; // Same deal as before
     public const float Log10EulerF = 0.4342945f; // Same deal as before
     public const float Log2EulerF = 1.442695f; // Same deal as before
-
-    // AVX requires a x86 CPU from at least 2011...
-    // So as long as you're not using like a 1st gen i7 you this should be supported
-    internal static bool X86SimdSupported = Avx.IsSupported;
-    internal static bool ArmSimdSupported = false; // Maybe...
 
     // These are all just a convenience wrappers over Math and MathF.
     // Trust me, typing MathF over and over gets kind of annoying after a while

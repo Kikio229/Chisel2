@@ -2,7 +2,6 @@
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.Intrinsics;
-using System.Runtime.Intrinsics.X86;
 
 namespace Chisel.Framework;
 
@@ -62,10 +61,9 @@ public struct Vector3 : IEquatable<Vector3>, IFormattable
 
     public float Length()
     {
-        if (MathUtilities.X86SimdSupported)
+        if (Vector128.IsHardwareAccelerated)
         {
-            Vector128<float> len = Sse.Sqrt(Sse41.DotProduct(_value, _value, 0xFF));
-            return Vector128.ToScalar(len);
+            return Vector128.Dot(_value, _value).Sqrt();
         }
 
         return ((X * X) + (Y * Y) + (Z * Z)).Sqrt();
@@ -73,10 +71,9 @@ public struct Vector3 : IEquatable<Vector3>, IFormattable
 
     public float LengthSquared()
     {
-        if (MathUtilities.X86SimdSupported)
+        if (Vector128.IsHardwareAccelerated)
         {
-            Vector128<float> len = Sse41.DotProduct(_value, _value, 0xFF);
-            return Vector128.ToScalar(len);
+            return Vector128.Dot(_value, _value);
         }
 
         return (X * X) + (Y * Y) + (Z * Z);
@@ -89,12 +86,10 @@ public struct Vector3 : IEquatable<Vector3>, IFormattable
 
     public float Distance(Vector3 vec)
     {
-        if (MathUtilities.X86SimdSupported)
+        if (Vector128.IsHardwareAccelerated)
         {
-            Vector128<float> diff, dist;
-            diff = Sse.Subtract(_value, vec._value);
-            dist = Sse.Sqrt(Sse41.DotProduct(diff, diff, 0xFF));
-            return Vector128.ToScalar(dist);
+            Vector128<float> diff = Vector128.Subtract(_value, vec._value);
+            return Vector128.Dot(diff, diff).Sqrt();
         }
 
         return ((X - vec.X) * (X - vec.X) + (Y - vec.Y) * (Y - vec.Y) + (Z - vec.Z) * (Z - vec.Z)).Sqrt();
@@ -102,12 +97,10 @@ public struct Vector3 : IEquatable<Vector3>, IFormattable
 
     public float DistanceSquared(Vector3 vec)
     {
-        if (MathUtilities.X86SimdSupported)
+        if (Vector128.IsHardwareAccelerated)
         {
-            Vector128<float> diff, dist;
-            diff = Sse.Subtract(_value, vec._value);
-            dist = Sse41.DotProduct(diff, diff, 0xFF);
-            return Vector128.ToScalar(dist);
+            Vector128<float> diff = Vector128.Subtract(_value, vec._value);
+            return Vector128.Dot(diff, diff);
         }
 
         return (X - vec.X) * (X - vec.X) + (Y - vec.Y) * (Y - vec.Y) + (Z - vec.Z) * (Z - vec.Z);
@@ -115,10 +108,9 @@ public struct Vector3 : IEquatable<Vector3>, IFormattable
 
     public float DotProduct(Vector3 vec)
     {
-        if (MathUtilities.X86SimdSupported)
+        if (Vector128.IsHardwareAccelerated)
         {
-            Vector128<float> dot = Sse41.DotProduct(_value, vec._value, 0xFF);
-            return Vector128.ToScalar(dot);
+            return Vector128.Dot(_value, vec._value);
         }
 
         return (X * vec.X) + (Y * vec.Y) + (Z * vec.Z);
@@ -126,14 +118,19 @@ public struct Vector3 : IEquatable<Vector3>, IFormattable
 
     public Vector3 CrossProduct(Vector3 vec)
     {
-        if (MathUtilities.X86SimdSupported)
+        if (Vector128.IsHardwareAccelerated)
         {
+            Vector128<int> mask1, mask2;
+            mask1 = Vector128.Create(1, 2, 0, 3);
+            mask2 = Vector128.Create(2, 0, 1, 3);
+
             Vector128<float> ayzx, byzx, azxy, bzxy;
-            ayzx = Sse.Shuffle(_value, _value, 0xC9);
-            byzx = Sse.Shuffle(vec._value, vec._value, 0xC9);
-            azxy = Sse.Shuffle(_value, _value, 0xD2);
-            bzxy = Sse.Shuffle(vec._value, vec._value, 0xD2);
-            return new Vector3(Sse.Subtract(Sse.Multiply(ayzx, bzxy), Sse.Multiply(azxy, byzx)));
+            ayzx = Vector128.Shuffle(_value, mask1);
+            byzx = Vector128.Shuffle(vec._value, mask1);
+            azxy = Vector128.Shuffle(_value, mask2);
+            bzxy = Vector128.Shuffle(vec._value, mask2);
+
+            return new Vector3(Vector128.Subtract(Vector128.Multiply(ayzx, bzxy), Vector128.Multiply(azxy, byzx)));
         }
 
         return new Vector3((Y * vec.Z) - (Z * vec.Y), (Z * vec.X) - (X * vec.Z), (X * vec.Y) - (Y * vec.X));
@@ -141,23 +138,16 @@ public struct Vector3 : IEquatable<Vector3>, IFormattable
 
     public Vector3 Negate()
     {
-        if (MathUtilities.X86SimdSupported)
+        if (Vector128.IsHardwareAccelerated)
         {
-            Vector128<float> mask = Vector128.Create(-0f);
-            return new Vector3(Sse.Xor(_value, mask));
+            return new Vector3(Vector128.Xor(_value, Vector128.Create(-0f)));
         }
 
         return new Vector3(-X, -Y, -Z);
     }
 
-    public Vector3 TransformByMatrix(Matrix4 mat)
+    public Vector3 TransformByMatrix(Matrix mat)
     {
-        // TODO: Some SIMD optimizations if possible?
-        if (MathUtilities.X86SimdSupported)
-        {
-
-        }
-
         float x = (X * mat.M11) + (Y * mat.M21) + (Z * mat.M31) + mat.M41;
         float y = (X * mat.M12) + (Y * mat.M22) + (Z * mat.M32) + mat.M42;
         float z = (X * mat.M13) + (Y * mat.M23) + (Z * mat.M33) + mat.M43;
@@ -166,12 +156,6 @@ public struct Vector3 : IEquatable<Vector3>, IFormattable
 
     public Vector3 TransformByQuaternion(Quaternion quat)
     {
-        // TODO: Some SIMD optimizations if possible?
-        if (MathUtilities.X86SimdSupported)
-        {
-
-        }
-
         float x = 2 * (quat.Y * Z - quat.Z * Y);
         float y = 2 * (quat.Z * X - quat.X * Z);
         float z = 2 * (quat.X * Y - quat.Y * X);
@@ -184,9 +168,9 @@ public struct Vector3 : IEquatable<Vector3>, IFormattable
 
     public Vector3 Min(Vector3 vec)
     {
-        if (MathUtilities.X86SimdSupported)
+        if (Vector128.IsHardwareAccelerated)
         {
-            return new Vector3(Sse.Min(_value, vec._value));
+            return new Vector3(Vector128.Min(_value, vec._value));
         }
 
         return new Vector3(X.Min(vec.X), Y.Min(vec.Y), Z.Min(vec.Z));
@@ -194,9 +178,9 @@ public struct Vector3 : IEquatable<Vector3>, IFormattable
 
     public Vector3 Max(Vector3 vec)
     {
-        if (MathUtilities.X86SimdSupported)
+        if (Vector128.IsHardwareAccelerated)
         {
-            return new Vector3(Sse.Max(_value, vec._value));
+            return new Vector3(Vector128.Max(_value, vec._value));
         }
 
         return new Vector3(X.Max(vec.X), Y.Max(vec.Y), Z.Max(vec.Z));
@@ -204,19 +188,10 @@ public struct Vector3 : IEquatable<Vector3>, IFormattable
 
     public Vector3 Normalize()
     {
-        if (MathUtilities.X86SimdSupported)
+        if (Vector128.IsHardwareAccelerated)
         {
-            Vector128<float> dot, ilen, half, threehalfs, ilenSqr;
-            dot = Sse41.DotProduct(_value, _value, 0xFF);
-            ilen = Sse.ReciprocalSqrt(dot);
-
-            // Newton-Raphson refinement
-            half = Vector128.Create(0.5f);
-            threehalfs = Vector128.Create(1.5f);
-            ilenSqr = Sse.Multiply(ilen, ilen);
-            ilen = Sse.Multiply(ilen, Sse.Subtract(threehalfs, Sse.Multiply(Sse.Multiply(dot, ilenSqr), half)));
-
-            return new Vector3(Sse.Multiply(_value, ilen));
+            float dot = Vector128.Dot(_value, _value);
+            return (dot > 0.0f) ? new Vector3(Vector128.Divide(_value, Vector128.Create(dot.Sqrt()))) : Vector3.Zero;
         }
 
         float len = Length();
@@ -225,12 +200,12 @@ public struct Vector3 : IEquatable<Vector3>, IFormattable
 
     public Vector3 Lerp(Vector3 vec, float amount)
     {
-        if (MathUtilities.X86SimdSupported)
+        if (Vector128.IsHardwareAccelerated)
         {
             Vector128<float> tvec, diff;
             tvec = Vector128.Create(amount);
-            diff = Sse.Subtract(vec._value, _value);
-            return new Vector3(Sse.Add(_value, Sse.Multiply(tvec, diff)));
+            diff = Vector128.Subtract(vec._value, _value);
+            return new Vector3(Vector128.Add(_value, Vector128.Multiply(tvec, diff)));
         }
 
         return new Vector3(
@@ -277,10 +252,9 @@ public struct Vector3 : IEquatable<Vector3>, IFormattable
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public readonly bool Equals(Vector3 other)
     {
-        if (MathUtilities.X86SimdSupported)
+        if (Vector128.IsHardwareAccelerated)
         {
-            Vector128<float> equal = Sse.CompareEqual(_value, other._value);
-            return Sse.MoveMask(equal) == 0xFF;
+            return Vector128.EqualsAll(_value, other._value);
         }
 
         return (X == other.X) && (Y == other.Y) && (Z == other.Z);
@@ -306,9 +280,9 @@ public struct Vector3 : IEquatable<Vector3>, IFormattable
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Vector3 Add(Vector3 left, Vector3 right)
     {
-        if (MathUtilities.X86SimdSupported)
+        if (Vector128.IsHardwareAccelerated)
         {
-            return new Vector3(Sse.Add(left._value, right._value));
+            return new Vector3(Vector128.Add(left._value, right._value));
         }
 
         return new Vector3(left.X + right.X, left.Y + right.Y, left.Z + right.Z);
@@ -323,9 +297,9 @@ public struct Vector3 : IEquatable<Vector3>, IFormattable
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Vector3 Subtract(Vector3 left, Vector3 right)
     {
-        if (MathUtilities.X86SimdSupported)
+        if (Vector128.IsHardwareAccelerated)
         {
-            return new Vector3(Sse.Subtract(left._value, right._value));
+            return new Vector3(Vector128.Subtract(left._value, right._value));
         }
 
         return new Vector3(left.X - right.X, left.Y - right.Y, left.Z - right.Z);
@@ -340,9 +314,9 @@ public struct Vector3 : IEquatable<Vector3>, IFormattable
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Vector3 Multiply(Vector3 left, Vector3 right)
     {
-        if (MathUtilities.X86SimdSupported)
+        if (Vector128.IsHardwareAccelerated)
         {
-            return new Vector3(Sse.Multiply(left._value, right._value));
+            return new Vector3(Vector128.Multiply(left._value, right._value));
         }
 
         return new Vector3(left.X * right.X, left.Y * right.Y, left.Z * right.Z);
@@ -357,9 +331,9 @@ public struct Vector3 : IEquatable<Vector3>, IFormattable
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Vector3 Divide(Vector3 left, Vector3 right)
     {
-        if (MathUtilities.X86SimdSupported)
+        if (Vector128.IsHardwareAccelerated)
         {
-            return new Vector3(Sse.Divide(left._value, right._value));
+            return new Vector3(Vector128.Divide(left._value, right._value));
         }
 
         return new Vector3(left.X / right.X, left.Y / right.Y, left.Z / right.Z);
