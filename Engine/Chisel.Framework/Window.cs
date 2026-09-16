@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Linq;
 using System.Runtime.InteropServices;
 using Hexa.NET.SDL3;
 
@@ -103,6 +104,10 @@ public class Window : Disposable
             throw new ArgumentException($"Unknown CHISEL_FORCE_BACKEND value: '{forced}'");
         }
 
+        // also makes a bit more sense to allow command line args... im dumb lol
+        if (Environment.GetCommandLineArgs().Any(s => s == "-opengl")) return GraphicsBackend.OpenGL;
+        if (Environment.GetCommandLineArgs().Any(s => s == "-vulkan")) return GraphicsBackend.Vulkan;
+
         return GraphicsBackend.OpenGL;
     }
 
@@ -120,16 +125,16 @@ public class Window : Disposable
         // GL has to init BEFORE the window
         if (Backend == GraphicsBackend.OpenGL)
         {
-            SDL.GLSetAttribute(SDLGLAttr.ContextProfileMask, 0x0001); // Core
             SDL.GLSetAttribute(SDLGLAttr.ContextMajorVersion, 4);
             SDL.GLSetAttribute(SDLGLAttr.ContextMinorVersion, 6);
+            SDL.GLSetAttribute(SDLGLAttr.ContextProfileMask, SDL.SDL_GL_CONTEXT_PROFILE_CORE); // Core
             SDL.GLSetAttribute(SDLGLAttr.DepthSize, 24);
             SDL.GLSetAttribute(SDLGLAttr.StencilSize, 8);
             SDL.GLSetAttribute(SDLGLAttr.Doublebuffer, 1);
             flags |= SDLWindowFlags.Opengl;
             if (IsDebug)
             {
-                SDL.GLSetAttribute(SDLGLAttr.ContextFlags, (int)0x0001);
+                SDL.GLSetAttribute(SDLGLAttr.ContextFlags, SDL.SDL_GL_CONTEXT_DEBUG_FLAG); // idk why i wasnt using these constants lol
             }
         }
 
@@ -141,6 +146,49 @@ public class Window : Disposable
         {
             GLContext = SDL.GLCreateContext(Handle);
             SDL.GLMakeCurrent(Handle, GLContext);
+
+#if WINDOWS
+            // See Window.WGL.cs to see why I have to do this nonsense lmao
+            uint props = SDL.GetWindowProperties(Handle);
+            IntPtr hwnd = (nint)SDL.GetPointerProperty(props, "SDL.window.win32.hwnd", IntPtr.Zero);
+
+            IntPtr hdc = NativeWGL.GetDC(hwnd);
+
+            var pfd = new PIXELFORMATDESCRIPTOR
+            {
+                nSize = (byte)Marshal.SizeOf<PIXELFORMATDESCRIPTOR>(),
+                nVersion = 1,
+                dwFlags = 0x20 | 0x4 | 0x1, // PFD_DRAW_TO_WINDOW | PFD_SUPPORT_OPENGL | PFD_DOUBLEBUFFER
+                iPixelType = 0,              // PFD_TYPE_RGBA
+                cColorBits = 32,
+                cDepthBits = 24,
+                cStencilBits = 8
+            };
+
+            int pf = NativeWGL.ChoosePixelFormat(hdc, ref pfd);
+            NativeWGL.SetPixelFormat(hdc, pf, ref pfd);
+
+            IntPtr dummy = NativeWGL.wglCreateContext(hdc);
+            NativeWGL.wglMakeCurrent(hdc, dummy);
+
+            var wglCreateContextAttribsARB = (NativeWGL.WGLCreateContextAttribsARB)
+                Marshal.GetDelegateForFunctionPointer(
+                    NativeWGL.wglGetProcAddress("wglCreateContextAttribsARB"),
+                    typeof(NativeWGL.WGLCreateContextAttribsARB));
+
+            int[] attribs =
+            {
+                0x2091, 4,   // WGL_CONTEXT_MAJOR_VERSION_ARB
+                0x2092, 6,   // WGL_CONTEXT_MINOR_VERSION_ARB
+                0x9126, 1,   // WGL_CONTEXT_PROFILE_MASK_ARB, WGL_CONTEXT_CORE_PROFILE_BIT_ARB
+                0
+            };
+
+            IntPtr glContext = wglCreateContextAttribsARB(hdc, IntPtr.Zero, attribs);
+            NativeWGL.wglMakeCurrent(IntPtr.Zero, IntPtr.Zero);
+            NativeWGL.wglDeleteContext(dummy);
+            NativeWGL.wglMakeCurrent(hdc, glContext);
+#endif
         }
 
         SDL.InitSubSystem((uint)SDLInitFlags.Gamepad); // Also initalizes the event and joystick subsystems
