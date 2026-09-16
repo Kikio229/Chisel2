@@ -144,9 +144,6 @@ public class Window : Disposable
 
         if (Backend == GraphicsBackend.OpenGL)
         {
-            GLContext = SDL.GLCreateContext(Handle);
-            SDL.GLMakeCurrent(Handle, GLContext);
-
 #if WINDOWS
             // See Window.WGL.cs to see why I have to do this nonsense lmao
             uint props = SDL.GetWindowProperties(Handle);
@@ -188,6 +185,11 @@ public class Window : Disposable
             NativeWGL.wglMakeCurrent(IntPtr.Zero, IntPtr.Zero);
             NativeWGL.wglDeleteContext(dummy);
             NativeWGL.wglMakeCurrent(hdc, glContext);
+            GLContext = glContext;
+            SDL.GLMakeCurrent(Handle, GLContext);
+#else
+            GLContext = SDL.GLCreateContext(Handle);
+            SDL.GLMakeCurrent(Handle, GLContext);
 #endif
         }
 

@@ -1,6 +1,5 @@
 ﻿using Chisel.Framework;
 using Chisel.Framework.UI;
-using Chisel.Framework.Utilities;
 using Chisel.Resource;
 using System;
 using System.Runtime.InteropServices;
