@@ -15,6 +15,9 @@ public abstract class UIObject(UILayoutOptions options)
 
     public bool Visible = true;
 
+    public UIEdgeInsets Margin = new UIEdgeInsets(0);
+    public UIEdgeInsets Padding = new UIEdgeInsets(5);
+
     public abstract bool AllowNavigatingTo { get; }
     public abstract bool AbsorbInputs { get; }
 
@@ -60,47 +63,50 @@ public abstract class UIObject(UILayoutOptions options)
 
             if (Anchor.HasFlag(UIAnchor.Left))
             {
-                localPos.X = -(pDim.X - HalfSize.X) + CenterOffset.X;
+                localPos.X = -(pDim.X - HalfSize.X) + CenterOffset.X + Margin.Left;
             }
             if (Anchor.HasFlag(UIAnchor.Right))
             {
-                localPos.X = (pDim.X - HalfSize.X) + CenterOffset.X;
+                localPos.X = (pDim.X - HalfSize.X) + CenterOffset.X - Margin.Right;
             }
             if (Anchor.HasFlag(UIAnchor.Top))
             {
-                localPos.Y = -(pDim.Y - HalfSize.Y) + CenterOffset.Y;
+                localPos.Y = -(pDim.Y - HalfSize.Y) + CenterOffset.Y + Margin.Top;
             }
             if (Anchor.HasFlag(UIAnchor.Bottom))
             {
-                localPos.Y = (pDim.Y - HalfSize.Y) + CenterOffset.Y;
+                localPos.Y = (pDim.Y - HalfSize.Y) + CenterOffset.Y - Margin.Bottom;
             }
 
             return pRight * localPos.X + pUp * localPos.Y + pPos;
         }
     }
+
     public Vector2 HalfSize
     {
         get
         {
             if (Parent == null) return HalfSizeOffset;
 
-            var pPos = Parent.Position;
             var pDim = Parent.HalfSizeOffset;
 
             var size = HalfSizeOffset;
 
             if (Anchor.HasFlag(UIAnchor.FillH))
             {
-                size.X = pDim.X + HalfSizeOffset.X;
+                size.X = pDim.X + HalfSizeOffset.X - (Margin.Left + Margin.Right) / 2f;
             }
             if (Anchor.HasFlag(UIAnchor.FillV))
             {
-                size.Y = pDim.Y + HalfSizeOffset.Y;
+                size.Y = pDim.Y + HalfSizeOffset.Y - (Margin.Top + Margin.Bottom) / 2f;
             }
 
             return size;
         }
     }
+
+    public Vector2 ContentTopLeft => Position - HalfSize + new Vector2(Padding.Left, Padding.Top);
+    public Vector2 ContentBottomRight => Position + HalfSize - new Vector2(Padding.Right, Padding.Bottom);
 
 
     // Gamepad navigation. These are implemented as a tree-walk so that

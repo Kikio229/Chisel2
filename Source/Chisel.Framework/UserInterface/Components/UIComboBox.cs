@@ -67,12 +67,12 @@ public class UIComboBox : UIPanel
     {
         base.OnRender(dt, batch, atlasTexture);
 
+        Vector2 topLeft = ContentTopLeft;
         var pos = Position;
-        var size = HalfSize;
         string label = SelectedIndex >= 0 && SelectedIndex < Items.Count ? Items[SelectedIndex] : string.Empty;
 
         Vector2 measured = batch.MeasureText(label, (int)FontSize);
-        batch.DrawString(label, (int)FontSize, new Vector2(pos.X - size.X + 6f, pos.Y - measured.Y / 2f), Color.White);
+        batch.DrawString(label, (int)FontSize, new Vector2(topLeft.X, pos.Y - measured.Y / 2f), Color.White);
     }
 
     private void Open()

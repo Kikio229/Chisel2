@@ -19,37 +19,38 @@ public class UITextBlock : UIObject
 
     public override void OnRender(float dt, SpriteBatch batch, Texture2D atlasTexture)
     {
-        var pos = Position;
         Vector2 measured = batch.MeasureText(Text, (int)FontSize);
+        Vector2 topLeft = ContentTopLeft;
+        Vector2 bottomRight = ContentBottomRight;
 
         float x;
 
         if (Anchor.HasFlag(UIAnchor.Left))
         {
-            x = pos.X;
+            x = topLeft.X;
         }
         else if (Anchor.HasFlag(UIAnchor.Right))
         {
-            x = pos.X - measured.X;
+            x = bottomRight.X - measured.X;
         }
         else
         {
-            x = pos.X - measured.X / 2f;
+            x = (topLeft.X + bottomRight.X) / 2f - measured.X / 2f;
         }
 
         float y;
 
         if (Anchor.HasFlag(UIAnchor.Top))
         {
-            y = pos.Y;
+            y = topLeft.Y;
         }
         else if (Anchor.HasFlag(UIAnchor.Bottom))
         {
-            y = pos.Y - measured.Y;
+            y = bottomRight.Y - measured.Y;
         }
         else
         {
-            y = pos.Y - measured.Y / 2f;
+            y = (topLeft.Y + bottomRight.Y) / 2f - measured.Y / 2f;
         }
 
         batch.DrawString(Text, (int)FontSize, new Vector2(x, y), TextColor);

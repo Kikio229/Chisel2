@@ -127,14 +127,14 @@ public class UITextInput : UIPanel
     {
         base.OnRender(dt, batch, atlasTexture);
 
+        Vector2 topLeft = ContentTopLeft;
         var pos = Position;
-        var size = HalfSize;
 
         string display = Text.Length > 0 ? Text : Placeholder;
         Color color = Text.Length > 0 ? Color.White : new Color(140, 140, 140);
 
         Vector2 measured = batch.MeasureText(display, (int)FontSize);
-        var textOrigin = new Vector2(pos.X - size.X + 6f, pos.Y - measured.Y / 2f);
+        var textOrigin = new Vector2(topLeft.X, pos.Y - measured.Y / 2f);
 
         batch.DrawString(display, (int)FontSize, textOrigin, color);
 

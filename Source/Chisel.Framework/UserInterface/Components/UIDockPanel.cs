@@ -43,39 +43,45 @@ public class UIDockPanel : UIPanel
     {
         var full = HalfSize;
 
-        float top = -full.Y;
-        float bottom = full.Y;
-        float left = -full.X;
-        float right = full.X;
+        float top = -full.Y + Padding.Top;
+        float bottom = full.Y - Padding.Bottom;
+        float left = -full.X + Padding.Left;
+        float right = full.X - Padding.Right;
 
         List<DockEntry> fillEntries = [];
 
         foreach (DockEntry entry in entries)
         {
+            UIEdgeInsets margin = entry.Child.Margin;
+
             switch (entry.Side)
             {
                 case DockSide.Top:
-                    entry.Child.HalfSizeOffset = new Vector2((right - left) / 2f, entry.Size / 2f);
-                    entry.Child.CenterOffset = new Vector2((left + right) / 2f, top + entry.Size / 2f);
-                    top += entry.Size;
+                    float topY = top + margin.Top;
+                    entry.Child.HalfSizeOffset = new Vector2((right - left - margin.Left - margin.Right) / 2f, entry.Size / 2f);
+                    entry.Child.CenterOffset = new Vector2((left + margin.Left + right - margin.Right) / 2f, topY + entry.Size / 2f);
+                    top += entry.Size + margin.Top + margin.Bottom;
                     break;
 
                 case DockSide.Bottom:
-                    entry.Child.HalfSizeOffset = new Vector2((right - left) / 2f, entry.Size / 2f);
-                    entry.Child.CenterOffset = new Vector2((left + right) / 2f, bottom - entry.Size / 2f);
-                    bottom -= entry.Size;
+                    float bottomY = bottom - margin.Bottom;
+                    entry.Child.HalfSizeOffset = new Vector2((right - left - margin.Left - margin.Right) / 2f, entry.Size / 2f);
+                    entry.Child.CenterOffset = new Vector2((left + margin.Left + right - margin.Right) / 2f, bottomY - entry.Size / 2f);
+                    bottom -= entry.Size + margin.Top + margin.Bottom;
                     break;
 
                 case DockSide.Left:
-                    entry.Child.HalfSizeOffset = new Vector2(entry.Size / 2f, (bottom - top) / 2f);
-                    entry.Child.CenterOffset = new Vector2(left + entry.Size / 2f, (top + bottom) / 2f);
-                    left += entry.Size;
+                    float leftX = left + margin.Left;
+                    entry.Child.HalfSizeOffset = new Vector2(entry.Size / 2f, (bottom - top - margin.Top - margin.Bottom) / 2f);
+                    entry.Child.CenterOffset = new Vector2(leftX + entry.Size / 2f, (top + margin.Top + bottom - margin.Bottom) / 2f);
+                    left += entry.Size + margin.Left + margin.Right;
                     break;
 
                 case DockSide.Right:
-                    entry.Child.HalfSizeOffset = new Vector2(entry.Size / 2f, (bottom - top) / 2f);
-                    entry.Child.CenterOffset = new Vector2(right - entry.Size / 2f, (top + bottom) / 2f);
-                    right -= entry.Size;
+                    float rightX = right - margin.Right;
+                    entry.Child.HalfSizeOffset = new Vector2(entry.Size / 2f, (bottom - top - margin.Top - margin.Bottom) / 2f);
+                    entry.Child.CenterOffset = new Vector2(rightX - entry.Size / 2f, (top + margin.Top + bottom - margin.Bottom) / 2f);
+                    right -= entry.Size + margin.Left + margin.Right;
                     break;
 
                 case DockSide.Fill:
@@ -86,8 +92,10 @@ public class UIDockPanel : UIPanel
 
         foreach (DockEntry entry in fillEntries)
         {
-            entry.Child.HalfSizeOffset = new Vector2((right - left) / 2f, (bottom - top) / 2f);
-            entry.Child.CenterOffset = new Vector2((left + right) / 2f, (top + bottom) / 2f);
+            UIEdgeInsets margin = entry.Child.Margin;
+
+            entry.Child.HalfSizeOffset = new Vector2((right - left - margin.Left - margin.Right) / 2f, (bottom - top - margin.Top - margin.Bottom) / 2f);
+            entry.Child.CenterOffset = new Vector2((left + margin.Left + right - margin.Right) / 2f, (top + margin.Top + bottom - margin.Bottom) / 2f);
         }
     }
 }
