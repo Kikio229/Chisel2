@@ -57,7 +57,7 @@ public class UITextInput : UIPanel
 
         bool shift = InputManager.IsInputHeld(Input.KeyLShift) || InputManager.IsInputHeld(Input.KeyRShift);
 
-        foreach (Input pressed in InputManager.GetPressedInputs())
+        foreach (Input pressed in InputManager.GetPressedInputs().Concat(InputManager.GetRepeatedInputs()))
         {
             switch (pressed)
             {

@@ -1,7 +1,9 @@
-﻿using System;
+﻿using Hexa.NET.SDL3;
+using System;
 using System.Collections.Generic;
 using System.Linq;
-using Hexa.NET.SDL3;
+using System.Runtime.InteropServices;
+using System.Text;
 
 namespace Chisel.Framework;
 
@@ -46,9 +48,14 @@ public static class InputManager
         get => _releasedInputs.Count > 0;
     }
 
+    public static string TextInputThisFrame => _textInputBuffer.ToString();
+
+    private static StringBuilder _textInputBuffer = new StringBuilder();
+
     private static HashSet<Input> _heldInputs = new HashSet<Input>();
     private static HashSet<Input> _pressedInputs = new HashSet<Input>();
     private static HashSet<Input> _releasedInputs = new HashSet<Input>();
+    private static HashSet<Input> _repeatedInputs = new HashSet<Input>();
     private static Dictionary<int, nint> _gamepadList = new Dictionary<int, nint>();
     private static Dictionary<Input, float> _gamepadAnalog = new Dictionary<Input, float>();
 
@@ -65,6 +72,16 @@ public static class InputManager
     public static Input[] GetReleasedInputs()
     {
         return _releasedInputs.ToArray();
+    }
+
+    public static Input[] GetRepeatedInputs()
+    {
+        return _repeatedInputs.ToArray();
+    }
+
+    public static bool IsInputRepeated(Input input)
+    {
+        return _repeatedInputs.Contains(input);
     }
 
     public static float GetGamepadAnalog(Input button, float deadzone)
@@ -93,10 +110,14 @@ public static class InputManager
         switch ((SDLEventType)ev.Type)
         {
             case SDLEventType.KeyDown:
+                Input keyDown = SdlKeyToInput(ev.Key.Scancode);
                 if (ev.Key.Repeat == 0)
                 {
-                    Input keyDown = SdlKeyToInput(ev.Key.Scancode);
                     if (_heldInputs.Add(keyDown)) _pressedInputs.Add(keyDown);
+                }
+                else
+                {
+                    _repeatedInputs.Add(keyDown);
                 }
                 break;
 
@@ -154,6 +175,10 @@ public static class InputManager
                 value = Math.Clamp(value, -1.0f, 1.0f);
                 _gamepadAnalog[axis] = value; // Setting them directly. Clearing them every frame causes issues
                 break;
+
+            case SDLEventType.TextInput:
+                _textInputBuffer.Append(Marshal.PtrToStringUTF8((nint)ev.Text.Text) ?? string.Empty);
+                break;
         }
     }
 
@@ -164,6 +189,8 @@ public static class InputManager
         MouseDelta = Vector2.Zero;
         _pressedInputs.Clear();
         _releasedInputs.Clear();
+        _textInputBuffer.Clear();
+        _repeatedInputs.Clear();
     }
 
     private static Input SdlKeyToInput(SDLScancode scancode)
