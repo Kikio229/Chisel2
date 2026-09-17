@@ -1,0 +1,20 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+	<Target Name="ChiselBuildContent" BeforeTargets="Build">
+		<Exec Command="dotnet run --project &quot;$(MSBuildThisFileDirectory)..\..\Source\Chisel.Resource.Builder&quot; -- &quot;$(MSBuildProjectDirectory)&quot; &quot;$(OutDir)Content&quot; --pack" />
+	</Target>
+
+	<ItemGroup>
+		<ProjectReference Include="..\..\Source\Chisel.Framework\Chisel.Framework.csproj" />
+		<ProjectReference Include="..\..\Source\Chisel.Resource.Builder\Chisel.Resource.Builder.csproj" />
+	</ItemGroup>
+
+</Project>

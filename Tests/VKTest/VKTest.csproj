@@ -11,8 +11,8 @@
 	<!-- TODO: Add content pipeline one it's set up for Vulkan -->
 
 	<ItemGroup>
-		<ProjectReference Include="..\..\Engine\Chisel.Framework\Chisel.Framework.csproj" />
-		<ProjectReference Include="..\..\Engine\Chisel.Resource.Builder\Chisel.Resource.Builder.csproj" />
+		<ProjectReference Include="..\..\Source\Chisel.Framework\Chisel.Framework.csproj" />
+		<ProjectReference Include="..\..\Source\Chisel.Resource.Builder\Chisel.Resource.Builder.csproj" />
 	</ItemGroup>
 
 </Project>

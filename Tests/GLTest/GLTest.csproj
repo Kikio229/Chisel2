@@ -9,11 +9,12 @@
   </PropertyGroup>
 
 	<Target Name="ChiselBuildContent" BeforeTargets="Build">
-		<Exec Command="dotnet run --project &quot;$(MSBuildThisFileDirectory)..\..\Engine\Chisel.Resource.Builder&quot; -- &quot;$(MSBuildProjectDirectory)&quot; &quot;$(OutDir)Content&quot; --pack" />
+		<Exec Command="dotnet run --project &quot;$(MSBuildThisFileDirectory)..\..\Source\Chisel.Resource.Builder&quot; -- &quot;$(MSBuildProjectDirectory)&quot; &quot;$(OutDir)Content&quot; --pack" />
 	</Target>
 
 	<ItemGroup>
-	  <ProjectReference Include="..\..\Engine\Chisel.Framework\Chisel.Framework.csproj" />
-	  <ProjectReference Include="..\..\Engine\Chisel.Resource.Builder\Chisel.Resource.Builder.csproj" />
+		<ProjectReference Include="..\..\Source\Chisel.Framework\Chisel.Framework.csproj" />
+		<ProjectReference Include="..\..\Source\Chisel.Resource.Builder\Chisel.Resource.Builder.csproj" />
 	</ItemGroup>
+
 </Project>
