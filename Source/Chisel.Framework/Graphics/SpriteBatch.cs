@@ -125,6 +125,12 @@ public class SpriteBatch : IDisposable
         fnt.DrawText(fontRenderer, text, position.ToNumerics(), new FSColor(color.R, color.G, color.B, color.A),
             effect:effect,effectAmount:effectStrength);
     }
+    public Vector2 MeasureText(string text, int fontSize)
+    {
+        var fnt = fontSystem.GetFont(fontSize);
+        var size = fnt.MeasureString(text);
+        return new Vector2(size.X, size.Y);
+    }
     public void Draw(Texture2D texture, Vector2 position, Vector2 size, Color color, Rectangle? sourceRectangle = null, float rotation = 0f, Vector2 origin = default)
     {
         Vector2 uvMin;

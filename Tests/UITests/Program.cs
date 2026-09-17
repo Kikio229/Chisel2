@@ -2,6 +2,7 @@
 using Chisel.Framework.UI;
 using Chisel.Resource;
 using System;
+using System.Collections.Generic;
 using System.Runtime.InteropServices;
 
 [StructLayout(LayoutKind.Sequential)]
@@ -46,6 +47,7 @@ public class TestGame : Game
     double elapsed;
 
     private UIManager uiManager;
+    private UIContextMenu testContextMenu;
 
     public TestGame() : base(GraphicsBackend.OpenGL, false)
     {
@@ -88,14 +90,126 @@ public class TestGame : Game
 
         uiManager.SetSize(Window.Resolution.W, Window.Resolution.H);
 
-        uiManager.AddToRoot(new UIWindow("Test window",default)
+        BuildTestUI();
+        UpdateProjection();
+    }
+
+    private void BuildTestUI()
+    {
+        var dockRoot = new UIDockPanel(default)
         {
-            Anchor = UIAnchor.Center,
-            HalfSizeOffset = new(200, 200),
-            CenterOffset = new(0,0)
+            Anchor = UIAnchor.FillH | UIAnchor.FillV,
+            HalfSizeOffset = new Vector2(0, 0),
+            CenterOffset = new Vector2(0, 0),
+            Tint = new Color(20, 20, 20),
+        };
+
+        var menuBar = new UIMenuBar(default)
+        {
+            Tint = new Color(15, 15, 15),
+        };
+
+        menuBar.SetMenus(new List<UIMenuBarMenu>
+        {
+            new UIMenuBarMenu("File", new List<UIMenuItem>
+            {
+                new UIMenuItem("New", () => Console.WriteLine("New clicked")),
+                new UIMenuItem("Open", () => Console.WriteLine("Open clicked")),
+                new UIMenuItem("Save", () => Console.WriteLine("Save clicked")),
+            }),
+            new UIMenuBarMenu("Edit", new List<UIMenuItem>
+            {
+                new UIMenuItem("Undo", () => Console.WriteLine("Undo clicked")),
+                new UIMenuItem("Redo", () => Console.WriteLine("Redo clicked")),
+            }),
         });
 
-        UpdateProjection();
+        var splitView = new UIFourWaySplitView(default)
+        {
+            Tint = new Color(20, 20, 20),
+        };
+
+        var topLeftLabel = new UITextBlock(default)
+        {
+            Anchor = UIAnchor.Top | UIAnchor.Left,
+            Text = "Text input test",
+            FontSize = 20,
+            CenterOffset = new Vector2(8, 8),
+        };
+        splitView.TopLeft.Tint = new Color(45, 55, 75);
+        splitView.TopLeft.AddChild(topLeftLabel);
+
+        var textInput = new UITextInput(default)
+        {
+            Anchor = UIAnchor.Top | UIAnchor.Left,
+            HalfSizeOffset = new Vector2(100, 16),
+            CenterOffset = new Vector2(108, 44),
+            Placeholder = "Type here...",
+            Tint = new Color(35, 35, 35),
+        };
+        splitView.TopLeft.AddChild(textInput);
+
+        var comboBox = new UIComboBox(default)
+        {
+            Anchor = UIAnchor.Center,
+            HalfSizeOffset = new Vector2(80, 16),
+            CenterOffset = new Vector2(0, 0),
+            Items = new List<string> { "Option A", "Option B", "Option C" },
+            SelectedIndex = 0,
+            Tint = new Color(35, 35, 35),
+        };
+        splitView.TopRight.Tint = new Color(45, 70, 50);
+        splitView.TopRight.AddChild(comboBox);
+
+        var checkButton = new UICheckButton(default)
+        {
+            Anchor = UIAnchor.Center,
+            HalfSizeOffset = new Vector2(16, 16),
+            CenterOffset = new Vector2(-60, 0),
+            Tint = new Color(35, 35, 35),
+        };
+        var checkLabel = new UITextBlock(default)
+        {
+            Anchor = UIAnchor.Center,
+            Text = "Enable thing",
+            FontSize = 20,
+            CenterOffset = new Vector2(30, 0),
+        };
+        splitView.BottomLeft.Tint = new Color(75, 50, 50);
+        splitView.BottomLeft.AddChild(checkButton);
+        splitView.BottomLeft.AddChild(checkLabel);
+
+        testContextMenu = new UIContextMenu(default);
+
+        var contextItems = new List<UIMenuItem>
+        {
+            new UIMenuItem("Delete", () => Console.WriteLine("Delete clicked")),
+            new UIMenuItem("Rename", () => Console.WriteLine("Rename clicked")),
+            new UIMenuItem("Properties", () => Console.WriteLine("Properties clicked")),
+        };
+
+        var contextTrigger = new UITestContextTrigger(default, testContextMenu, contextItems)
+        {
+            Anchor = UIAnchor.FillH | UIAnchor.FillV,
+            Tint = new Color(60, 60, 40),
+        };
+
+        var rightClickHint = new UITextBlock(default)
+        {
+            Anchor = UIAnchor.Top | UIAnchor.Left,
+            Text = "Right click for menu",
+            FontSize = 20,
+            CenterOffset = new Vector2(8, 8),
+        };
+
+        splitView.BottomRight.AddChild(contextTrigger);
+        contextTrigger.AddChild(rightClickHint);
+        contextTrigger.AddChildOnTop(testContextMenu);
+
+        dockRoot.AddDocked(menuBar, DockSide.Top, 32);
+        dockRoot.AddFill(splitView);
+
+        uiManager.AddToRoot(dockRoot);
     }
 
     void UpdateProjection()
@@ -283,6 +397,22 @@ public class TestGame : Game
         cubeIndices.Dispose();
         screenTexture.Dispose();
         spriteBatch.Dispose();
+    }
+}
+public class UITestContextTrigger : UIPanel
+{
+    private readonly UIContextMenu contextMenu;
+    private readonly List<UIMenuItem> items;
+
+    public UITestContextTrigger(UILayoutOptions options, UIContextMenu contextMenu, List<UIMenuItem> items) : base(options)
+    {
+        this.contextMenu = contextMenu;
+        this.items = items;
+    }
+
+    public override void OnSecondaryClicked()
+    {
+        contextMenu.Show(InputManager.MousePosition, items);
     }
 }
 

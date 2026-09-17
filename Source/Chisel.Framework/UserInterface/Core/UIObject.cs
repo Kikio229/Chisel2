@@ -13,6 +13,8 @@ public abstract class UIObject(UILayoutOptions options)
     public UIAnchor Anchor;
     public float RotationOffset;
 
+    public bool Visible = true;
+
     public abstract bool AllowNavigatingTo { get; }
     public abstract bool AbsorbInputs { get; }
 
@@ -87,7 +89,7 @@ public abstract class UIObject(UILayoutOptions options)
 
             var size = HalfSizeOffset;
 
-            if(Anchor.HasFlag(UIAnchor.FillH))
+            if (Anchor.HasFlag(UIAnchor.FillH))
             {
                 size.X = pDim.X + HalfSizeOffset.X;
             }
@@ -130,7 +132,9 @@ public abstract class UIObject(UILayoutOptions options)
 
     public void Update(float dt)
     {
-        if(IsMouseOverRect(new Rectangle(Position - HalfSize, Position + HalfSize)))
+        if (!Visible) return;
+
+        if (IsMouseOverRect(new Rectangle(Position - HalfSize, Position + HalfSize)))
         {
             if (!IsHighlighted) OnHighlighted();
             IsHighlighted = true;
@@ -141,7 +145,7 @@ public abstract class UIObject(UILayoutOptions options)
             IsHighlighted = false;
         }
 
-        if(IsHighlighted && InputManager.IsInputHeld(Input.MouseLeft))
+        if (IsHighlighted && InputManager.IsInputHeld(Input.MouseLeft))
         {
             if (!IsSelected)
             {
@@ -164,13 +168,15 @@ public abstract class UIObject(UILayoutOptions options)
 
         OnUpdate(dt);
 
-        for(int i = Children.Count-1; i >= 0; i--)
+        for (int i = Children.Count - 1; i >= 0; i--)
         {
             Children[i].Update(dt);
         }
     }
     public void Render(float dt, SpriteBatch batch, Texture2D atlasTexture)
     {
+        if (!Visible) return;
+
         OnRender(dt, batch, atlasTexture);
 
         for (int i = Children.Count - 1; i >= 0; i--)
@@ -198,6 +204,13 @@ public abstract class UIObject(UILayoutOptions options)
         child.Parent = this;
         Children.Add(child);
     }
+
+    public void AddChildOnTop(UIObject child)
+    {
+        child.Parent = this;
+        Children.Insert(0, child);
+    }
+
     public void RemoveChild(UIObject child)
     {
         child.Parent = null;
