@@ -1,0 +1,17 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ConsoleApp1\DynEngine.csproj" />
+  </ItemGroup>
+
+    <Target Name="CopyToEngineGameFolder" AfterTargets="Build">
+	    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(SolutionDir)Tests\DynamicLoading\ConsoleApp1\bin\Release\net9.0\GameDemo\" />
+    </Target>
+
+</Project>

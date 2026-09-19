@@ -10,4 +10,8 @@
     <Project Path="Tests/UITests/UITests.csproj" />
     <Project Path="Tests/VKTest/VKTest.csproj" />
   </Folder>
+  <Folder Name="/Tests/Dynamic Loading/">
+    <Project Path="Tests/DynamicLoading/ConsoleApp1/DynEngine.csproj" Id="79447619-397a-4bb0-ab29-c59632640bba" />
+    <Project Path="Tests/DynamicLoading/DynGame/DynGame.csproj" Id="400409df-43fb-47fd-83b1-d8d1f68e1601" />
+  </Folder>
 </Solution>

@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "Profile 1": {
+      "commandName": "Executable",
+      "executablePath": "C:\\Users\\tidwe\\source\\repos\\Kikio229\\Chisel2\\Tests\\DynamicLoading\\ConsoleApp1\\bin\\Release\\net9.0\\DynEngine.exe",
+      "commandLineArgs": "\"GameDemo/DynGame.dll\"",
+      "workingDirectory": "C:\\Users\\tidwe\\source\\repos\\Kikio229\\Chisel2\\Tests\\DynamicLoading\\ConsoleApp1\\bin\\Release\\net9.0"
+    }
+  }
+}
