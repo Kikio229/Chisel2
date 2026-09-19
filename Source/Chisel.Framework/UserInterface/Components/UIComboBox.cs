@@ -15,13 +15,16 @@ public class UIComboBox : UIPanel
     private bool isOpen;
     private UIPanel popup;
 
+    public Color ChildItemTint = new Color(0.05f, 0.05f, 0.05f);
+    public Color SelectTint = new Color(0.2f, 0.2f, 0.2f);
+    public Color HighlightTint = new Color(0.3f, 0.3f, 0.3f);
+
     public UIComboBox(UILayoutOptions options) : base(options)
     {
     }
 
-    public override Rectangle PanelRect => IsHighlighted
-        ? new Rectangle(352, 32, 96, 32)
-        : new Rectangle(352, 0, 96, 32);
+    public override Rectangle PanelRect => (IsSelected ? new Rectangle(192 + 32, 32, 32, 32) :
+                                           (IsHighlighted ? new Rectangle(192, 32 + 32, 32, 32) : new Rectangle(192, 32, 32, 32)));
 
     public override void OnPrimaryClicked()
     {
@@ -73,6 +76,8 @@ public class UIComboBox : UIPanel
 
         Vector2 measured = batch.MeasureText(label, (int)FontSize);
         batch.DrawString(label, (int)FontSize, new Vector2(topLeft.X, pos.Y - measured.Y / 2f), Color.White);
+
+        RenderPanel(dt, batch, atlasTexture, Color.White, PanelRect + new Rectangle(0, 64, 0, 0));
     }
 
     private void Open()
@@ -81,7 +86,7 @@ public class UIComboBox : UIPanel
 
         popup = new UIPanel(LayoutOptions) { Anchor = UIAnchor.Top };
         popup.HalfSizeOffset = new Vector2(HalfSizeOffset.X, Items.Count * RowHeight / 2f);
-        popup.CenterOffset = new Vector2(0, HalfSize.Y * 2f + popup.HalfSizeOffset.Y);
+        popup.CenterOffset = new Vector2(0, HalfSize.Y + popup.HalfSizeOffset.Y * 0.5f);
         popup.Tint = new Color(30, 30, 30);
 
         for (int i = 0; i < Items.Count; i++)
@@ -92,6 +97,10 @@ public class UIComboBox : UIPanel
             {
                 HalfSizeOffset = new Vector2(popup.HalfSizeOffset.X, RowHeight / 2f),
                 CenterOffset = new Vector2(0, -popup.HalfSizeOffset.Y + RowHeight / 2f + i * RowHeight),
+                Style = ButtonStyle.Flat,
+                BaseTint = ChildItemTint,
+                SelectTint = SelectTint,
+                HighlightTint = HighlightTint,
             };
 
             row.OnClicked += () =>

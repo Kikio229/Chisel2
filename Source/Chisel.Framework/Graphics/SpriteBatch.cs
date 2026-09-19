@@ -122,7 +122,7 @@ public class SpriteBatch : IDisposable
     {
         var fnt = fontSystem.GetFont(fontSize);
 
-        fnt.DrawText(fontRenderer, text, position.ToNumerics(), new FSColor(color.R, color.G, color.B, color.A),
+        fnt.DrawText(fontRenderer, text, System.Numerics.Vector2.Round(position.ToNumerics()), new FSColor(color.R, color.G, color.B, color.A),
             effect:effect,effectAmount:effectStrength);
     }
     public Vector2 MeasureText(string text, int fontSize)

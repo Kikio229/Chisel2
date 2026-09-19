@@ -37,6 +37,10 @@ public class UIMenuBar : UIPanel
     private UIPanel openPopup;
     private int openIndex = -1;
 
+    public Color ChildItemTint = new Color(0.05f, 0.05f, 0.05f);
+    public Color SelectTint = new Color(0.2f, 0.2f, 0.2f);
+    public Color HighlightTint = new Color(0.3f, 0.3f, 0.3f);
+
     public UIMenuBar(UILayoutOptions options) : base(options)
     {
     }
@@ -61,6 +65,10 @@ public class UIMenuBar : UIPanel
                 Anchor = UIAnchor.Left | UIAnchor.FillV,
                 HalfSizeOffset = new Vector2(MenuWidth / 2f, 0),
                 CenterOffset = new Vector2(i * MenuWidth, 0),
+                Style = ButtonStyle.Flat,
+                BaseTint = Color.Transparent,
+                SelectTint = SelectTint,
+                HighlightTint = HighlightTint,
             };
 
             button.OnClicked += () => ToggleMenu(index);
@@ -98,6 +106,10 @@ public class UIMenuBar : UIPanel
             {
                 HalfSizeOffset = new Vector2(openPopup.HalfSizeOffset.X, RowHeight / 2f),
                 CenterOffset = new Vector2(0, -openPopup.HalfSizeOffset.Y + RowHeight / 2f + i * RowHeight),
+                Style = ButtonStyle.Flat,
+                BaseTint = ChildItemTint,
+                SelectTint = SelectTint,
+                HighlightTint = HighlightTint,
             };
 
             row.OnClicked += () =>

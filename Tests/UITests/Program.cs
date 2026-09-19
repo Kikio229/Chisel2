@@ -156,7 +156,6 @@ public class TestGame : Game
             CenterOffset = new Vector2(0, 0),
             Items = new List<string> { "Option A", "Option B", "Option C" },
             SelectedIndex = 0,
-            Tint = new Color(35, 35, 35),
         };
         splitView.TopRight.Tint = new Color(45, 70, 50);
         splitView.TopRight.AddChild(comboBox);

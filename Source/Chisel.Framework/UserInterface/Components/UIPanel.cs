@@ -55,6 +55,8 @@ public class UIPanel : UIObject
         int[] dstW = { destCornerW, fullW - destCornerW * 2, destCornerW };
         int[] dstH = { destCornerH, fullH - destCornerH * 2, destCornerH };
 
+        batch.SetClip(new((int)(Position.X - HalfSize.X), (int)(Position.Y - HalfSize.Y), fullW, fullH));
+
         int xpos = (int)(Position.X - HalfSize.X);
         for (int x = 0; x < 3; x++)
         {
@@ -67,8 +69,6 @@ public class UIPanel : UIObject
             }
             xpos += dstW[x];
         }
-
-        //batch.SetClip(new((int)(Position.X - HalfSize.X), (int)(Position.Y - HalfSize.Y), fullW, fullH));
     }
     public override void OnUpdate(float dt)
     {
